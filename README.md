@@ -40,3 +40,4 @@ Tuần qua đã làm xong file nào?
 Đang bị kẹt (blocker) ở đâu?
 
 Mục tiêu tuần tới là gì?# stop-the-darkness-A-
+# stop-the-darkness
