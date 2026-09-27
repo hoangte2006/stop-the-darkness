@@ -9,28 +9,61 @@ Woodcutter cạnh rừng, Quarry cạnh đá...
 import random
 
 from entities.building import TowerOfLight
+from core.constants import GRID_ROWS, GRID_COLS
+
+
+def build_spiral_order(rows, cols):
+    """Tính thứ tự 144 ô: tu goc duoi-trai, vong het mep ngoai, roi thu dan vao tam."""
+    order = []
+    top = 0
+    bottom = rows - 1
+    left = 0
+    right = cols - 1
+
+    while top <= bottom and left <= right:
+        # canh duoi: tu (bottom, left) sang phai toi (bottom, right)
+        for c in range(left, right + 1):
+            order.append((bottom, c))
+
+        # canh phai: tu duoi len tren toi (top, right)
+        for r in range(bottom - 1, top - 1, -1):
+            order.append((r, right))
+
+        if top < bottom:
+            # canh tren: tu phai sang trai toi (top, left)
+            for c in range(right - 1, left - 1, -1):
+                order.append((top, c))
+
+        if left < right:
+            # canh trai: tu tren xuong duoi, khong lay lai 2 goc da di qua
+            for r in range(top + 1, bottom):
+                order.append((r, left))
+
+        top += 1
+        bottom -= 1
+        left += 1
+        right -= 1
+
+    return order
+
+_SPIRAL_ORDER = build_spiral_order(GRID_ROWS, GRID_COLS)   # tinh 1 lan, dung mai
+_progress = 0   # da di toi o thu bao nhieu trong _SPIRAL_ORDER
 
 
 def spread_darkness(grid):
-    """Lan bóng tối thêm 1 ô (thuật toán tạm, sẽ thay bằng BFS thật)."""
-    dark_tiles = [tile for row in grid for tile in row if tile.is_dark]
-    if not dark_tiles:
-        return
+    """Toi dan 1 o theo dung thu tu vong xoay da tinh san trong _SPIRAL_ORDER."""
+    global _progress
 
-    rows, cols = len(grid), len(grid[0])
-    source = random.choice(dark_tiles)
-    neighbors = [
-        (source.row - 1, source.col),
-        (source.row + 1, source.col),
-        (source.row, source.col - 1),
-        (source.row, source.col + 1),
-    ]
-    for nr, nc in neighbors:
-        if 0 <= nr < rows and 0 <= nc < cols:
-            target = grid[nr][nc]
-            if not target.is_dark and not isinstance(target.building, TowerOfLight):
-                target.is_dark = True
-                break
+    if _progress >= len(_SPIRAL_ORDER):
+        return   # da toi het toan bo ban do, khong con o nao de toi nua
+
+    row, col = _SPIRAL_ORDER[_progress]
+    tile = grid[row][col] 
+    if not tile.is_lighted:
+        tile.is_dark = True
+
+    _progress += 1
+
 
 
 def is_adjacent_to(grid, row, col, terrain):
@@ -40,3 +73,27 @@ def is_adjacent_to(grid, row, col, terrain):
         if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc].terrain == terrain:
             return True
     return False
+
+# hàm update_light() được chuyển sang core/rules.py để tách riêng luật game khỏi trạng thái game.
+# nhiệm vụ của hàm này là cập nhật trạng thái is_lighted của các ô dựa trên Tháp Ánh Sáng.
+def update_light(grid):
+    """Cập nhật trạng thái is_lighted của các ô dựa trên Tháp Ánh Sáng."""
+    rows, cols = len(grid), len(grid[0]) 
+    for r in range(rows):
+        for c in range(cols):
+            tile = grid[r][c]
+
+            tile.is_lighted = isinstance(tile.building, TowerOfLight) 
+            if not tile.is_lighted:
+            
+                for nr, nc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)): 
+                    if 0 <= nr < rows and 0 <= nc < cols:
+                        neighbor_tile = grid[nr][nc]
+                        if isinstance(neighbor_tile.building, TowerOfLight):
+                            tile.is_lighted = True
+                            break
+
+def is_darkness_finished():
+    """Bong toi da lan het toan bo vong xoay (khong con o nao de lan tiep)."""
+    global _progress
+    return _progress >= len(_SPIRAL_ORDER)

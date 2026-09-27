@@ -1,1 +1,1 @@
-"""Start and game-over menus.""
+"""Start and game-over menus."""

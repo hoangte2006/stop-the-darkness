@@ -15,10 +15,11 @@ from entities.tile import Tile
 class GameState:
     def __init__(self):
         # 1. Kho tài nguyên người chơi
-        self.resources = {"wood": 30, "stone": 20, "tech": 0, "light": 0}
+        self.resources = {"wood": 0, "stone": 0, "tech": 0, "light": 0}
 
         # 2. Trạng thái UI dùng chung
         self.is_paused = False
+        self.game_over = False
         self.selected_tile = None
 
         # 3. Sinh bản đồ địa hình (TV6 sẽ thay generate_map bằng thuật toán thật)
@@ -56,7 +57,7 @@ class GameState:
         if tile.is_dark or tile.building is not None:
             return False
         enough = True
-        for res, amount in building_cls.cost.items():   # vd cost = {"wood": 30, "stone": 10}
+        for res, amount in building_cls.base_cost .items():   # vd cost = {"wood": 30, "stone": 10}
             have = self.resources.get(res, 0)             # tui đang có bao nhiêu res đó
             if have < amount:                              # không đủ 1 loại là fail luôn
                 enough = False
@@ -65,11 +66,23 @@ class GameState:
             return False
 
 
-        for res, amount in building_cls.cost.items():
+
+        for res, amount in building_cls.base_cost .items():
             self.resources[res] -= amount
         tile.building = building_cls(row, col)
         return True
 
+    def upgrade_building(self, row, col):
+        """Nâng cấp công trình tại (row, col). Trả về True nếu thành công."""
+        tile = self.get_tile(row, col)
+        if tile is None or tile.building is None:
+            return False
+        return tile.building.upgrade(self.resources)
+
+    def update_light(self):
+        """Cập nhật trạng thái is_lighted của các ô dựa trên Tháp Ánh Sáng."""
+        rules.update_light(self.grid)
+        
     def tick_resources(self):
         """Cộng tài nguyên mỗi giây dựa trên các công trình đang hoạt động (chưa bị bóng tối)."""
         if self.is_paused:
@@ -81,10 +94,17 @@ class GameState:
                         self.resources[res] = self.resources.get(res, 0) + amount
 
     def spread_darkness(self):
-        """Lan bóng tối thêm 1 nhịp. Thuật toán thật (BFS) nằm trong core/rules.py."""
+        """Lan bóng tối thêm 1 nhịp. trong core/rules.py."""
         if self.is_paused:
             return
         rules.spread_darkness(self.grid)
+        self._check_game_over()
+
+def _check_game_over(self):
+    """Kiểm tra thua: bóng tối đã lan hết mức có thể (đã duyệt hết bản đồ)."""
+    if rules.is_darkness_finished():
+        self.game_over = True
+
 
     def to_dict(self):
         """Chuyển toàn bộ trạng thái game thành dict thuần (JSON-serializable) cho TV4 lưu file."""
@@ -98,6 +118,7 @@ class GameState:
         return {
             "resources": dict(self.resources),
             "grid": grid_data,
+            "game_over": self.game_over,
         }
 
     def load_from_dict(self, data):

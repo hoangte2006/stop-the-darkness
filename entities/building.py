@@ -11,42 +11,84 @@ from entities.base import Entity
 class Building(Entity):
     """Class cha cho mọi công trình xây trên 1 Tile."""
 
-    key = "building"        # ID định danh dùng để lưu/tải file, vd "woodcutter"
-    name = "Building"       # Tên hiển thị trên UI
-    cost = {}                # vd {"wood": 30}
-    produces = {}            # Tài nguyên tạo ra mỗi giây, vd {"wood": 2}
-    icon_key = "default"    # Tên sprite trong renderer
+    key = "building"          # ID định danh dùng để lưu/tải file, vd "woodcutter"
+    name = "Building"         # Tên hiển thị trên UI
+    base_cost = {}            # Giá xây ban đầu (level 1), vd {"wood": 30}
+    cost_multiplier = 1.5     # Mỗi cấp nâng, giá x1.5
+    base_produces = {}        # Sản lượng ở level 1, vd {"wood": 2}
+    icon_key = "default"      # Tên sprite trong renderer
+    max_level = 3
 
     def __init__(self, row, col):
         super().__init__(entity_id=f"{self.key}_{row}_{col}", row=row, col=col)
         self.level = 1
 
-    # là 
-    def to_dict(self):  
+    @property
+    def produces(self):
+        """Sản lượng thực tế hiện tại, tăng theo level."""
+        result = {}
+        for res, amount in self.base_produces.items():
+            result[res] = amount * self.level
+        return result # trả về dict chứa sản lượng thực tế theo level : vd: {"wood": 2} -> level 1, {"wood": 4} -> level 2, {"wood": 6} -> level 3
+
+    def cost_for_next_level(self):
+        """Giá cần trả để nâng từ level hiện tại lên level + 1."""
+        factor = self.cost_multiplier ** (self.level - 1) # ví dụ level 1 -> 2: x1.5, level 2 -> 3: x1.5^2 = x2.25
+        result = {}
+        for res, amount in self.base_cost.items():
+            result[res] = round(amount * factor) # round để tránh số lẻ, ví dụ 10 * 1.5 = 15, nhưng 10 * 1.5^2 = 22.5 -> round thành 23
+        return result
+
+    # Nâng cấp công trình: trừ tài nguyên và tăng level nếu đủ tiền, chưa đạt max_level.
+    def upgrade(self, resources):
+        """Trừ resources và tăng level nếu đủ tiền, chưa đạt max_level."""
+        if self.level >= self.max_level:
+            return False
+
+        cost = self.cost_for_next_level()
+
+        enough = True
+        for res, amount in cost.items(): # vd cost = {"wood": 30, "stone": 10}
+            have = resources.get(res, 0) # tui đang có bao nhiêu res đó vd: resources = {"wood": 50, "stone": 5} -> have = 5
+            if have < amount: # không đủ 1 loại là fail luôn vd: 5 < 10 -> enough = False
+                enough = False
+                break
+        if not enough:
+            return False
+
+        # Trừ tài nguyên và nâng level 
+        for res, amount in cost.items(): 
+            resources[res] -= amount
+        self.level += 1
+        return True
+
+    # Chuyển Building thành dict thuần để TV4 lưu ra JSON.
+    def to_dict(self):
         return {"key": self.key, "row": self.row, "col": self.col, "level": self.level}
 
 
-class Woodcutter(Building): # 
+
+class Woodcutter(Building):
     key = "woodcutter"
     name = "Nhà đốn gỗ"
-    cost = {"wood": 30}
-    produces = {"wood": 2}
+    base_cost = {"wood": 30}
+    base_produces = {"wood": 2}
     icon_key = "woodcutter"
 
 
 class Quarry(Building):
     key = "quarry"
     name = "Mỏ đá"
-    cost = {"wood": 20, "stone": 10}
-    produces = {"stone": 1}
+    base_cost = {"wood": 20, "stone": 10}
+    base_produces = {"stone": 1}
     icon_key = "quarry"
 
 
 class TowerOfLight(Building):
     key = "tower_of_light"
     name = "Tháp ánh sáng"
-    cost = {"wood": 30, "stone": 10}
-    produces = {"light": 1}
+    base_cost = {"wood": 30, "stone": 10}
+    base_produces = {"light": 1}
     icon_key = "tower_of_light"
 
 

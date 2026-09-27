@@ -1,4 +1,3 @@
-# main.py
 import sys
 
 import pygame
@@ -37,18 +36,21 @@ def main():
 
             elif event.type == DARKNESS_EVENT:
                 game.spread_darkness()
+                if game.game_over:
+                    game.is_paused = True  # Tạm dừng game khi thua
 
             # Là sự kiện nhấn phím Space để tạm dừng / tiếp tục game
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     game.is_paused = not game.is_paused
 
+            # là sự kiện nhấn chuột trái / phải để chọn ô hoặc xây Tháp Ánh Sáng
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Chuột trái: chọn ô
-                    mx, my = pygame.mouse.get_pos()
-                    row = my // TILE_SIZE
-                    col = mx // TILE_SIZE
-                    game.selected_tile = game.get_tile(row, col)
+                    mx, my = pygame.mouse.get_pos() # Lấy vị trí chuột
+                    row = my // TILE_SIZE # Tính hàng có nghĩa là chia vị trí y cho kích thước ô , ví dụ 150 // 50 = 3 được hàng thứ 3
+                    col = mx // TILE_SIZE 
+                    game.selected_tile = game.get_tile(row, col)  # Lấy ô đã chọn
 
                 elif event.button == 3:  # Chuột phải: xây Tháp Ánh Sáng thử nghiệm
                     if game.selected_tile:
@@ -83,7 +85,7 @@ def main():
                 pygame.draw.rect(screen, COLOR_GRID_LINE, rect, 1)  # Viền ô
 
         # Vẽ viền vàng cho ô đang được chọn
-        if game.selected_tile:
+        if game.selected_tile: 
             sel_rect = pygame.Rect(
                 game.selected_tile.col * TILE_SIZE,
                 game.selected_tile.row * TILE_SIZE,
@@ -101,7 +103,7 @@ def main():
             f"Wood: {game.resources['wood']} | Stone: {game.resources['stone']} | "
             f"Light: {game.resources['light']}"
         )
-        screen.blit(title_font.render("RESOURCES", True, (255, 255, 255)), (SIDEBAR_X + 20, 20))
+        screen.blit(title_font.render("RESOURCES", True, (255, 255, 255)), (SIDEBAR_X + 20, 20)) 
         screen.blit(font.render(res_text, True, (200, 220, 200)), (SIDEBAR_X + 20, 50))
 
         # Trạng thái Pause
@@ -125,7 +127,7 @@ def main():
                 (SIDEBAR_X + 20, 235),
             )
 
-            cost_text = ", ".join(f"{amt} {res}" for res, amt in TowerOfLight.cost.items())
+            cost_text = ", ".join(f"{amt} {res}" for res, amt in TowerOfLight.base_cost.items())
             screen.blit(
                 font.render(f"[Right Click] to build Tower (Cost: {cost_text})", True, (240, 240, 150)),
                 (SIDEBAR_X + 20, 280),
