@@ -5,6 +5,7 @@ import pygame
 from core.constants import *
 from core.game_state import GameState
 from entities.building import TowerOfLight
+from saves.save_manager import save_game, load_game
 
 
 def main():
@@ -26,12 +27,12 @@ def main():
     running = True
     while running:
         # --- 1. BẮT SỰ KIỆN CHUỘT VÀ PHÍM ---
-        for event in pygame.event.get(): 
+        for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
             # là sự kiện cộng tài nguyên
-            elif event.type == RESOURCE_EVENT: 
+            elif event.type == RESOURCE_EVENT:
                 game.tick_resources()
 
             elif event.type == DARKNESS_EVENT:
@@ -44,12 +45,34 @@ def main():
                 if event.key == pygame.K_SPACE:
                     game.is_paused = not game.is_paused
 
+                elif event.key == pygame.K_s:
+
+                    save_game(game.to_dict())
+                    print("Game saved!")
+                    print("File: saves/save.json")
+
+                elif event.key == pygame.K_l:
+                    try:
+                        loaded_data = load_game("saves/save.json")
+
+                        # Khôi phục resources
+                        game.load_from_dict(loaded_data)
+                        print("Game loaded!")
+                        print("File: saves/save.json")
+
+                    except FileNotFoundError:
+                        print("Không tìm thấy save game!")
+                        print("Hãy nhấn S để lưu game trước.")
+
+                    except Exception as e:
+                        print(f"Load game thất bại: {e}")
+
             # là sự kiện nhấn chuột trái / phải để chọn ô hoặc xây Tháp Ánh Sáng
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Chuột trái: chọn ô
                     mx, my = pygame.mouse.get_pos() # Lấy vị trí chuột
                     row = my // TILE_SIZE # Tính hàng có nghĩa là chia vị trí y cho kích thước ô , ví dụ 150 // 50 = 3 được hàng thứ 3
-                    col = mx // TILE_SIZE 
+                    col = mx // TILE_SIZE
                     game.selected_tile = game.get_tile(row, col)  # Lấy ô đã chọn
 
                 elif event.button == 3:  # Chuột phải: xây Tháp Ánh Sáng thử nghiệm
@@ -85,7 +108,7 @@ def main():
                 pygame.draw.rect(screen, COLOR_GRID_LINE, rect, 1)  # Viền ô
 
         # Vẽ viền vàng cho ô đang được chọn
-        if game.selected_tile: 
+        if game.selected_tile:
             sel_rect = pygame.Rect(
                 game.selected_tile.col * TILE_SIZE,
                 game.selected_tile.row * TILE_SIZE,
@@ -103,7 +126,7 @@ def main():
             f"Wood: {game.resources['wood']} | Stone: {game.resources['stone']} | "
             f"Light: {game.resources['light']}"
         )
-        screen.blit(title_font.render("RESOURCES", True, (255, 255, 255)), (SIDEBAR_X + 20, 20)) 
+        screen.blit(title_font.render("RESOURCES", True, (255, 255, 255)), (SIDEBAR_X + 20, 20))
         screen.blit(font.render(res_text, True, (200, 220, 200)), (SIDEBAR_X + 20, 50))
 
         # Trạng thái Pause

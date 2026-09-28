@@ -106,29 +106,29 @@ class GameState:
             self.game_over = True
 
 
-        def to_dict(self):
-            """Chuyển toàn bộ trạng thái game thành dict thuần (JSON-serializable) cho TV4 lưu file."""
-            grid_data = []
-            for row in self.grid:
-                row_data = []
-                for tile in row:
-                    row_data.append(tile.to_dict())
-                grid_data.append(row_data)
+    def to_dict(self):
+        """Chuyển toàn bộ trạng thái game thành dict thuần (JSON-serializable) cho TV4 lưu file."""
+        grid_data = []
+        for row in self.grid:
+            row_data = []
+            for tile in row:
+                row_data.append(tile.to_dict())
+            grid_data.append(row_data)
 
-            return {
-                "resources": dict(self.resources),
-                "grid": grid_data,
-                "game_over": self.game_over,
-            }
+        return {
+            "resources": dict(self.resources),
+            "grid": grid_data,
+            "game_over": self.game_over,
+        }
 
-        def load_from_dict(self, data):
-            """Nạp lại trạng thái game từ dict do TV4 đọc từ file JSON (đảo ngược của to_dict)."""
-            self.resources = dict(data["resources"])
-            for r, row in enumerate(data["grid"]):
-                for c, tile_data in enumerate(row):
-                    tile = self.grid[r][c]
-                    tile.terrain = tile_data["terrain"]
-                    tile.is_dark = tile_data["is_dark"]
-                    tile.is_lighted = tile_data["is_lighted"]
-                    building_key = tile_data["building"]
-                    tile.building = BUILDING_TYPES[building_key](r, c) if building_key else None
+    def load_from_dict(self, data):
+        """Nạp lại trạng thái game từ dict do TV4 đọc từ file JSON (đảo ngược của to_dict)."""
+        self.resources = dict(data["resources"])
+        for r, row in enumerate(data["grid"]):
+            for c, tile_data in enumerate(row):
+                tile = self.grid[r][c]
+                tile.terrain = tile_data["terrain"]
+                tile.is_dark = tile_data["is_dark"]
+                tile.is_lighted = tile_data["is_lighted"]
+                building_key = tile_data["building"]
+                tile.building = BUILDING_TYPES[building_key](r, c) if building_key else None
