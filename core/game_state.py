@@ -15,14 +15,14 @@ from entities.tile import Tile
 class GameState:
     def __init__(self):
         # 1. Kho tài nguyên người chơi
-        self.resources = {"wood": 0, "stone": 0, "tech": 0, "light": 0}
+        self.resources = {"wood": 12, "stone": 0, "tech": 0, "light": 0}
 
         # 2. Trạng thái UI dùng chung
         self.is_paused = False
         self.game_over = False
         self.selected_tile = None
 
-        # 3. Sinh bản đồ địa hình (TV6 sẽ thay generate_map bằng thuật toán thật)
+        # 3. Sinh bản đồ địa hình (TV6 đã thay code)
         terrain_map = generate_map(GRID_ROWS, GRID_COLS)
         self.grid = []
         for r in range(GRID_ROWS):
@@ -45,9 +45,9 @@ class GameState:
         return None
 
     def add_building(self, row, col, building_key):
-        """Xây công trình `building_key` (vd "woodcutter") tại (row, col).
+        """Đặt công trình `building_key` (vd "woodcutter") tại (row, col).
 
-        Trả về True nếu xây thành công, False nếu ô không hợp lệ, đã có công
+        Trả về True nếu đặt thành công, False nếu ô không hợp lệ, đã có công
         trình, đang bị bóng tối, hoặc không đủ tài nguyên.
         """
         tile = self.get_tile(row, col)
@@ -56,19 +56,19 @@ class GameState:
             return False
         if tile.is_dark or tile.building is not None:
             return False
+
         enough = True
-        for res, amount in building_cls.base_cost .items():   # vd cost = {"wood": 30, "stone": 10}
-            have = self.resources.get(res, 0)             # tui đang có bao nhiêu res đó
-            if have < amount:                              # không đủ 1 loại là fail luôn
+        for res, amount in building_cls.base_cost.items():
+            have = self.resources.get(res, 0)
+            if have < amount:
                 enough = False
                 break
         if not enough:
             return False
 
-
-
-        for res, amount in building_cls.base_cost .items():
+        for res, amount in building_cls.base_cost.items():
             self.resources[res] -= amount
+
         tile.building = building_cls(row, col)
         return True
 

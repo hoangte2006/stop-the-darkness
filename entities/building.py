@@ -71,7 +71,7 @@ class Building(Entity):
 class Woodcutter(Building):
     key = "woodcutter"
     name = "Nhà đốn gỗ"
-    base_cost = {"wood": 30}
+    base_cost = {"wood": 2}
     base_produces = {"wood": 2}
     icon_key = "woodcutter"
 
@@ -79,7 +79,7 @@ class Woodcutter(Building):
 class Quarry(Building):
     key = "quarry"
     name = "Mỏ đá"
-    base_cost = {"wood": 20, "stone": 10}
+    base_cost = {"wood": 8}
     base_produces = {"stone": 1}
     icon_key = "quarry"
 

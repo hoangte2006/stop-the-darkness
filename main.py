@@ -5,7 +5,7 @@ import pygame
 from core.constants import *
 from core.game_state import GameState
 from entities.building import TowerOfLight
-from saves.save_manager import save_game, load_game
+from services.storage import save_game, load_game
 
 
 def main():
@@ -80,6 +80,26 @@ def main():
                         game.add_building(
                             game.selected_tile.row, game.selected_tile.col, TowerOfLight.key
                         )
+            # Crtl + S để lưu game, Ctrl + L để load game
+            elif event.type == pygame.KEYDOWN and pygame.key.get_mods() & pygame.KMOD_CTRL:
+                if event.key == pygame.K_s:
+                    save_game(game.to_dict())
+                    print("Game saved!")
+                    print("File: saves/save.json")
+
+                elif event.key == pygame.K_l:
+                    try:
+                        loaded_data = load_game("saves/save.json")
+                        game.load_from_dict(loaded_data)
+                        print("Game loaded!")
+                        print("File: saves/save.json")
+
+                    except FileNotFoundError:
+                        print("Không tìm thấy save game!")
+                        print("Hãy nhấn Ctrl + S để lưu game trước.")
+
+                    except Exception as e:
+                        print(f"Load game thất bại: {e}")
 
         # --- 2. VẼ TOÀN BỘ MÀN HÌNH ---
         screen.fill(COLOR_BG)
