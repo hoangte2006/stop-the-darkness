@@ -61,8 +61,10 @@ Hằng số dùng chung: `GRID_ROWS`, `GRID_COLS`, `TILE_SIZE`, `SIDEBAR_X`,
 khi load save).
 
 **Building con hiện có:**
-- `Woodcutter` — 30 wood → 2 wood/s ở level 1.
-- `Quarry` — 20 wood + 10 stone → 1 stone/s ở level 1.
+- `Woodcutter` — 2 wood → 2 wood/s ở level 1 (giá thấp để khởi động kinh tế,
+  người chơi có sẵn 12 wood lúc bắt đầu).
+- `Quarry` — 8 wood (không cần stone, vì Quarry chính là nguồn tạo ra stone
+  đầu tiên) → 1 stone/s ở level 1.
 - `TowerOfLight` — 30 wood + 10 stone → 1 light/s ở level 1, còn tự phát sáng
   bảo vệ ô xung quanh (xem `update_light` bên dưới).
 
@@ -84,23 +86,27 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
 - `upgrade_building(row: int, col: int) -> bool` — nâng cấp công trình đã có
   trên ô đó; `False` nếu ô trống hoặc không đủ điều kiện (gọi thẳng vào
   `Building.upgrade()`).
+- `remove_building(row: int, col: int) -> bool` — phá bỏ công trình tại ô đó
+  (nút "Demolish/Sell"); `False` nếu ô trống hoặc không có công trình.
+- `set_speed(multiplier: int) -> None` — đặt tốc độ mô phỏng (1/2/3). Bản
+  thân `GameState` chỉ lưu `speed_multiplier`; **main.py** mới là nơi thực sự
+  rút ngắn nhịp đồng hồ (`pygame.time.set_timer`) dựa theo giá trị này.
 - `tick_resources() -> None` — cộng tài nguyên theo các building đang hoạt
-  động (gọi mỗi giây).
+  động (gọi theo nhịp `RESOURCE_EVENT` của main.py).
 - `spread_darkness() -> None` — lan bóng tối thêm 1 ô theo thứ tự vòng xoáy
-  (gọi mỗi 3 giây), rồi tự kiểm tra điều kiện thua.
+  (gọi theo nhịp `DARKNESS_EVENT` của main.py), rồi tự kiểm tra điều kiện thua.
 - `to_dict() -> dict` — serialize toàn bộ state, đưa cho `services/storage.save_game`.
 - `load_from_dict(data: dict) -> None` — nạp lại state từ dict do
   `services/storage.load_game` đọc được.
 
 **Thuộc tính public:**
-- `resources: dict[str, int]`
+- `resources: dict[str, int]` — bắt đầu `{"wood": 12, "stone": 0, "tech": 0, "light": 0}`.
 - `grid: list[list[Tile]]`
 - `selected_tile: Tile | None`
 - `is_paused: bool`
-- `game_over: bool` — `True` khi toàn bộ bàn cờ đã bị bóng tối chiếm hết. TV5
-  dùng để hiện màn hình Game Over.
-
----
+- `game_over: bool` — `True` khi bóng tối đã lan hết mức có thể. TV5 dùng để
+  hiện màn hình Game Over.
+- `speed_multiplier: int` — 1/2/3, đổi qua `set_speed()`.
 
 ## `core/rules.py` — logic thuật toán, `GameState` gọi vào
 
@@ -123,10 +129,29 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
   bàn cờ dựa trên `game.grid` (dùng `tile.terrain`, `tile.building.icon_key`,
   `tile.is_dark`, `tile.is_lighted`).
 - **TV3 — `ui/button.py`**: class `Button` với `handle_event(event) -> bool`
-  (trả `True` nếu bị click) và `is_clicked(mouse_pos) -> bool`.
-  **`ui/sidebar.py`**: hiển thị `game.resources`, danh sách building từ
-  `entities.building.BUILDING_TYPES`, gọi `game.add_building(...)` khi bấm
-  nút xây và `game.upgrade_building(...)` khi bấm nút nâng cấp.
+  (trả `True` nếu bị click), `is_clicked(mouse_pos) -> bool`, và
+  `draw(screen) -> None`.
+  **`ui/sidebar.py`**: class `Sidebar` (không phải hàm đơn) — tạo **1 lần**
+  trước vòng lặp game (`sidebar = Sidebar()`), rồi gọi 3 method mỗi frame:
+  - `sidebar.handle_event(event, game) -> None` — gọi cho **mọi** sự kiện
+    trong vòng lặp bắt sự kiện (không chỉ click chuột, còn cần bắt hover).
+    Tự xử lý nút Pause/1x/2x/3x (gọi `game.set_speed`), Upgrade/Demolish
+    (gọi `game.upgrade_building`/`game.remove_building`), và các nút xây
+    từng loại building (gọi `game.add_building`).
+  - `sidebar.update(game) -> None` — gọi 1 lần mỗi frame (trước khi vẽ) để
+    cập nhật màu/trạng thái bật-tắt của từng nút theo `game` hiện tại.
+  - `sidebar.draw(screen, game) -> None` — vẽ toàn bộ sidebar lên `screen`.
+
+  Ví dụ dùng trong `main.py`:
+  ```python
+  sidebar = Sidebar()                      # 1 lan truoc vong lap
+  ...
+  for event in pygame.event.get():
+      sidebar.handle_event(event, game)    # moi su kien
+  ...
+  sidebar.update(game)                     # moi frame, truoc khi ve
+  sidebar.draw(screen, game)
+  ```
 - **TV4 — `services/storage.py`**: `save_game(data: dict, filename: str) -> bool`
   (nhận `game.to_dict()`), `load_game(filename: str) -> dict` (trả dict để
   truyền vào `game.load_from_dict(...)`).
@@ -134,14 +159,19 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
   `play_sfx(name: str) -> None`, `set_volume(value: float) -> None`. Đồng
   thời hiện màn hình Game Over khi `game.game_over` là `True`.
 - **TV6 — `core/map_generator.py`**: `generate_map(rows: int = GRID_ROWS, cols: int = GRID_COLS) -> list[list[str]]`
-  (đã có bản mock random ở khung, thay bằng Cellular Automata/Perlin Noise thật —
-  **giữ nguyên chữ ký**, `game_state.py` đang gọi thẳng vào hàm này).
+  — **đã hoàn thành** (Cellular Automata gom cụm, đúng tỷ lệ 50/25/15/10%
+  grass/forest/water/rock). `game_state.py` gọi thẳng vào hàm này, không cần
+  sửa gì thêm.
 
 ---
 
 ## Việc còn lại của Leader (chưa xong, không chặn ai)
 
+- **Cơ chế buff theo ô kề (adjacency bonus)** — dùng `rules.is_adjacent_to()`
+  đã có sẵn, nối vào `tick_resources()` để công trình cạnh nhau tự cộng thêm
+  sản lượng. Đây là nền tảng để thêm các loại building mới (Village,
+  PortVillage...) sau này.
 - Điều kiện thắng (vd sống sót đủ N nhịp) — chưa chốt số, sẽ thêm
   `game.game_won` tương tự `game_over`.
-- `entities/building.py`: gắn luật xây theo ô kề (`is_adjacent_to`) vào
-  `add_building`, nếu nhóm muốn buff/giới hạn vị trí xây.
+- `entities/building.py`: gắn luật xây theo ô kề (vd Woodcutter phải cạnh
+  rừng) vào `add_building`, nếu nhóm muốn giới hạn vị trí xây theo địa hình.
