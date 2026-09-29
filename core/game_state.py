@@ -100,10 +100,10 @@ class GameState:
         rules.spread_darkness(self.grid)
         self._check_game_over()
 
-def _check_game_over(self):
-    """Kiểm tra thua: bóng tối đã lan hết mức có thể (đã duyệt hết bản đồ)."""
-    if rules.is_darkness_finished():
-        self.game_over = True
+    def _check_game_over(self):
+        """Kiểm tra thua: bóng tối đã lan hết mức có thể (đã duyệt hết bản đồ)."""
+        if rules.is_darkness_finished():
+            self.game_over = True
 
 
     def to_dict(self):
