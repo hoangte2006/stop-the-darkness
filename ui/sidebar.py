@@ -1,8 +1,7 @@
-"""Right-side game control panel."""
 """
 UI Package - File: sidebar.py
-Quản lý thanh điều khiển bên phải màn hình.
-Hiển thị kho tài nguyên, thông tin ô đất được chọn và xử lý logic các nút bấm xây dựng/nâng cấp.
+Manages the right-side control panel.
+Displays resources, tile info, speed controls, and building interactions.
 """
 
 import pygame
@@ -11,17 +10,9 @@ from entities.building import BUILDING_TYPES
 from ui.button import Button
 
 class Sidebar:
-    """
-    Lớp Sidebar chứa các thành phần giao diện hiển thị thông tin trò chơi.
-    Liên kết dữ liệu tĩnh từ GameState và thao tác người dùng xuống hệ thống.
-    """
+    """ Sidebar class containing game UI elements and interactions. """
 
     def __init__(self):
-        """
-        Khởi tạo thanh Sidebar, thiết lập font chữ, màu sắc và tạo danh sách các nút bấm.
-        Tham số nhận vào: Không có.
-        Trả về: Không có (None).
-        """
         self.sidebar_rect = pygame.Rect(SIDEBAR_X, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT)
         
         self.font_title = pygame.font.SysFont("Verdana", 16, bold=True)
@@ -30,59 +21,84 @@ class Sidebar:
         
         self.bg_color = (15, 18, 22)
         self.text_color = (200, 200, 205)
+        self.current_speed = 1 
         
-        # Khởi tạo nút nâng cấp mặc định
+        self._initialize_speed_buttons()
+
+        # Upgrade Button
         self.upgrade_button = Button(
-            rect=(self.sidebar_rect.x + 20, 400, self.sidebar_rect.width - 40, 35),
-            text="Nâng cấp công trình",
-            font=self.font_normal
+            rect=(self.sidebar_rect.x + 20, 360, self.sidebar_rect.width - 40, 35),
+            text="Upgrade Building",
+            font=self.font_normal,
+            bg_color=(45, 100, 50),
+            hover_color=(60, 130, 70)
+        )
+        
+        # Demolish Button (Red Warning)
+        self.demolish_button = Button(
+            rect=(self.sidebar_rect.x + 20, 405, self.sidebar_rect.width - 40, 35),
+            text="Demolish / Sell",
+            font=self.font_normal,
+            bg_color=(150, 50, 50),
+            hover_color=(180, 70, 70)
         )
         
         self.build_buttons: dict[str, Button] = {}
         self._initialize_build_buttons()
 
+    def _initialize_speed_buttons(self) -> None:
+        btn_width, btn_height = 40, 25
+        start_x = self.sidebar_rect.x + 20
+        y_pos = 110 
+        spacing = 5
+
+        self.btn_pause = Button((start_x, y_pos, btn_width, btn_height), "||", self.font_normal)
+        self.btn_1x = Button((start_x + (btn_width + spacing) * 1, y_pos, btn_width, btn_height), "1x", self.font_normal)
+        self.btn_2x = Button((start_x + (btn_width + spacing) * 2, y_pos, btn_width, btn_height), "2x", self.font_normal)
+        self.btn_3x = Button((start_x + (btn_width + spacing) * 3, y_pos, btn_width, btn_height), "3x", self.font_normal)
+        
+        self.speed_buttons = [self.btn_pause, self.btn_1x, self.btn_2x, self.btn_3x]
+
     def _initialize_build_buttons(self) -> None:
-        """
-        Hàm nội bộ: Khởi tạo linh động danh sách nút xây dựng dựa trên BUILDING_TYPES.
-        Tham số nhận vào: Không có.
-        Trả về: Không có (None).
-        """
-        start_y_position = 220
-        # Duyệt qua danh sách công trình từ entity để tạo nút tự động
+        start_y_position = 250 
         for index, (building_key, building_class) in enumerate(BUILDING_TYPES.items()):
-            button_y = start_y_position + index * 45
+            button_y = start_y_position + index * 55 
             self.build_buttons[building_key] = Button(
                 rect=(self.sidebar_rect.x + 20, button_y, self.sidebar_rect.width - 40, 35),
-                text=f"Xây {building_class.name}",
+                text=f"Build {building_class.name}",
                 font=self.font_normal
             )
 
     def _has_enough_resources(self, required_cost: dict[str, int], current_resources: dict[str, int]) -> bool:
-        """
-        Hàm nội bộ: So sánh tài nguyên hiện có với chi phí yêu cầu.
-        Tham số nhận vào: required_cost (giá tiền), current_resources (tài nguyên đang có).
-        Trả về: True nếu người chơi đủ mọi loại tài nguyên yêu cầu, ngược lại False.
-        """
-        # Kiểm tra mọi loại tài nguyên yêu cầu đều phải nhỏ hơn hoặc bằng tài nguyên đang có
         return all(current_resources.get(resource_name, 0) >= required_amount 
                    for resource_name, required_amount in required_cost.items())
 
     def handle_event(self, event: pygame.event.Event, game_state) -> None:
-        """
-        Bắt sự kiện click chuột trên giao diện thanh bên và gửi lệnh thực thi xuống GameState.
-        Tham số nhận vào: event (sự kiện của pygame), game_state (đối tượng quản lý trạng thái).
-        Trả về: Không có (None).
-        """
+        if self.btn_pause.handle_event(event):
+            game_state.is_paused = not game_state.is_paused
+        elif self.btn_1x.handle_event(event):
+            game_state.is_paused = False
+            self.current_speed = 1
+            if hasattr(game_state, 'set_speed'): game_state.set_speed(1)
+        elif self.btn_2x.handle_event(event):
+            game_state.is_paused = False
+            self.current_speed = 2
+            if hasattr(game_state, 'set_speed'): game_state.set_speed(2)
+        elif self.btn_3x.handle_event(event):
+            game_state.is_paused = False
+            self.current_speed = 3
+            if hasattr(game_state, 'set_speed'): game_state.set_speed(3)
+
         selected_tile = game_state.selected_tile
         if not selected_tile:
             return
 
-        # Nhánh 1: Nếu ô đã có công trình, chỉ kiểm tra nút nâng cấp
         if selected_tile.building:
             if self.upgrade_button.handle_event(event):
                 game_state.upgrade_building(selected_tile.row, selected_tile.col)
-                
-        # Nhánh 2: Nếu ô trống và chưa bị bóng tối chiếm, kiểm tra các nút xây dựng
+            elif self.demolish_button.handle_event(event):
+                if hasattr(game_state, 'remove_building'): 
+                    game_state.remove_building(selected_tile.row, selected_tile.col)
         elif not selected_tile.is_dark:
             for building_key, button in self.build_buttons.items():
                 if button.handle_event(event):
@@ -90,29 +106,43 @@ class Sidebar:
                     break
 
     def update(self, game_state) -> None:
-        """
-        Cập nhật trạng thái bật/tắt (is_enabled) của các nút dựa trên lượng tài nguyên mỗi frame.
-        Tham số nhận vào: game_state (để đọc lượng tài nguyên hiện tại).
-        Trả về: Không có (None).
-        """
         mouse_position = pygame.mouse.get_pos()
+        
+        ACTIVE_COLOR = (80, 120, 180)  
+        PAUSE_COLOR = (180, 60, 60)    
+        NORMAL_COLOR = (45, 50, 60)    
+
+        if getattr(game_state, 'is_paused', False):
+            self.btn_pause.bg_color = PAUSE_COLOR
+        else:
+            self.btn_pause.bg_color = NORMAL_COLOR
+
+        is_running = not getattr(game_state, 'is_paused', False)
+        self.btn_1x.bg_color = ACTIVE_COLOR if (self.current_speed == 1 and is_running) else NORMAL_COLOR
+        self.btn_2x.bg_color = ACTIVE_COLOR if (self.current_speed == 2 and is_running) else NORMAL_COLOR
+        self.btn_3x.bg_color = ACTIVE_COLOR if (self.current_speed == 3 and is_running) else NORMAL_COLOR
+
+        for btn in self.speed_buttons:
+            btn.is_hovered = btn.rect.collidepoint(mouse_position)
+            
         selected_tile = game_state.selected_tile
         
-        # Cập nhật logic hiển thị cho nút nâng cấp
         if selected_tile and selected_tile.building and not selected_tile.is_dark:
             current_building = selected_tile.building
+            
             is_max_level = current_building.level >= current_building.max_level
             can_afford_upgrade = self._has_enough_resources(current_building.cost_for_next_level(), game_state.resources)
-            
             self.upgrade_button.is_enabled = (not is_max_level) and can_afford_upgrade
             self.upgrade_button.is_hovered = self.upgrade_button.rect.collidepoint(mouse_position)
+            
+            self.demolish_button.is_enabled = True
+            self.demolish_button.is_hovered = self.demolish_button.rect.collidepoint(mouse_position)
         else:
             self.upgrade_button.is_enabled = False
+            self.demolish_button.is_enabled = False
 
-        # Cập nhật logic hiển thị cho danh sách nút xây dựng
         for building_key, button in self.build_buttons.items():
             button.is_hovered = button.rect.collidepoint(mouse_position)
-            
             if selected_tile and selected_tile.building is None and not selected_tile.is_dark:
                 building_class = BUILDING_TYPES[building_key]
                 button.is_enabled = self._has_enough_resources(building_class.base_cost, game_state.resources)
@@ -120,55 +150,56 @@ class Sidebar:
                 button.is_enabled = False
 
     def draw(self, screen: pygame.Surface, game_state) -> None:
-        """
-        Vẽ toàn bộ khung Sidebar bao gồm chỉ số tài nguyên, thông tin ô và các nút bấm.
-        Tham số nhận vào: screen (bề mặt để vẽ), game_state (dữ liệu trò chơi).
-        Trả về: Không có (None).
-        """
-        # 1. Vẽ nền và đường viền phân cách
         pygame.draw.rect(screen, self.bg_color, self.sidebar_rect)
         pygame.draw.line(screen, (60, 65, 75), (self.sidebar_rect.x, 0), (self.sidebar_rect.x, SCREEN_HEIGHT), 2)
 
-        # 2. Render Khu vực Kho Tài Nguyên
-        title_surface = self.font_title.render("KHO TÀI NGUYÊN", True, (240, 200, 100))
-        screen.blit(title_surface, (self.sidebar_rect.x + 15, 15))
+        screen.blit(self.font_title.render("RESOURCES", True, (240, 200, 100)), (self.sidebar_rect.x + 15, 15))
         
         resource_texts = [
-            f"🪵 Gỗ: {game_state.resources.get('wood', 0)}",
-            f"🪨 Đá: {game_state.resources.get('stone', 0)}",
-            f"💡 Sáng: {game_state.resources.get('light', 0)}"
+            f"🪵 Wood: {game_state.resources.get('wood', 0)}",
+            f"🪨 Stone: {game_state.resources.get('stone', 0)}",
+            f"💡 Light: {game_state.resources.get('light', 0)}"
         ]
         for index, text in enumerate(resource_texts):
-            text_surface = self.font_normal.render(text, True, self.text_color)
-            screen.blit(text_surface, (self.sidebar_rect.x + 20, 45 + index * 22))
+            screen.blit(self.font_normal.render(text, True, self.text_color), (self.sidebar_rect.x + 20, 40 + index * 20))
 
-        # 3. Render Thông tin chi tiết của Ô đất (Tile)
-        pygame.draw.line(screen, (40, 45, 55), (self.sidebar_rect.x + 10, 120), (self.sidebar_rect.right - 10, 120))
+        for btn in self.speed_buttons:
+            btn.draw(screen)
+
+        pygame.draw.line(screen, (40, 45, 55), (self.sidebar_rect.x + 10, 150), (self.sidebar_rect.right - 10, 150))
         selected_tile = game_state.selected_tile
         
         if not selected_tile:
-            empty_surface = self.font_normal.render("Chọn 1 ô trên bản đồ...", True, (120, 120, 120))
-            screen.blit(empty_surface, (self.sidebar_rect.x + 15, 135))
+            screen.blit(self.font_normal.render("Select a tile on the map...", True, (120, 120, 120)), (self.sidebar_rect.x + 15, 165))
             return
 
-        # Tô màu tên địa hình cho dễ nhìn
         terrain_color = (150, 255, 150) if selected_tile.terrain == "grass" else (100, 200, 255)
-        terrain_text = f"Ô [{selected_tile.row}, {selected_tile.col}] - {selected_tile.terrain.upper()}"
-        screen.blit(self.font_title.render(terrain_text, True, terrain_color), (self.sidebar_rect.x + 15, 135))
+        terrain_text = f"Tile [{selected_tile.row}, {selected_tile.col}] - {selected_tile.terrain.upper()}"
+        screen.blit(self.font_title.render(terrain_text, True, terrain_color), (self.sidebar_rect.x + 15, 165))
         
-        # Đánh giá trạng thái ô đất
-        status_text = "Bị Nuốt Chửng!" if selected_tile.is_dark else ("Được Chiếu Sáng" if selected_tile.is_lighted else "Trong Bóng Tối")
+        status_text = "Consumed!" if selected_tile.is_dark else ("Illuminated" if selected_tile.is_lighted else "In Darkness")
         status_color = (255, 80, 80) if selected_tile.is_dark else ((255, 255, 100) if selected_tile.is_lighted else (150, 150, 150))
-        screen.blit(self.font_normal.render(f"Trạng thái: {status_text}", True, status_color), (self.sidebar_rect.x + 15, 160))
+        screen.blit(self.font_normal.render(f"Status: {status_text}", True, status_color), (self.sidebar_rect.x + 15, 190))
 
-        # 4. Render Menu Xây dựng hoặc Menu Nâng cấp
         if selected_tile.building:
             current_building = selected_tile.building
             building_title = f"{current_building.name} (Lv {current_building.level}/{current_building.max_level})"
-            screen.blit(self.font_title.render(building_title, True, (100, 220, 255)), (self.sidebar_rect.x + 15, 200))
+            screen.blit(self.font_title.render(building_title, True, (100, 220, 255)), (self.sidebar_rect.x + 15, 225))
             
+            if self.upgrade_button.is_hovered and current_building.level < current_building.max_level:
+                cost_dict = current_building.cost_for_next_level()
+                cost_str = " | ".join([f"{v} {k}" for k, v in cost_dict.items()])
+                screen.blit(self.font_small.render(f"Cost: {cost_str}", True, (255, 255, 150)), (self.sidebar_rect.x + 20, 345))
+
             self.upgrade_button.draw(screen)
+            self.demolish_button.draw(screen)
+
         elif not selected_tile.is_dark:
-            screen.blit(self.font_title.render("CÔNG TRÌNH", True, (240, 200, 100)), (self.sidebar_rect.x + 15, 195))
+            screen.blit(self.font_title.render("BUILDINGS", True, (240, 200, 100)), (self.sidebar_rect.x + 15, 225))
             for building_key, button in self.build_buttons.items():
                 button.draw(screen)
+                
+                if button.is_hovered:
+                    cost_dict = BUILDING_TYPES[building_key].base_cost
+                    cost_str = " | ".join([f"{v} {k}" for k, v in cost_dict.items()])
+                    screen.blit(self.font_small.render(f"Cost: {cost_str}", True, (255, 255, 150)), (button.rect.x, button.rect.bottom + 2))
