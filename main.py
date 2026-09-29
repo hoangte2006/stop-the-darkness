@@ -6,6 +6,7 @@ from core.constants import *
 from core.game_state import GameState
 from entities.building import TowerOfLight
 from services.storage import save_game, load_game
+from ui.sidebar import Sidebar
 
 
 def main():
@@ -13,21 +14,29 @@ def main():
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Stop The Darkness - Python Prototype")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Arial", 16)
-    title_font = pygame.font.SysFont("Arial", 20, bold=True)
 
     game = GameState()
+    sidebar = Sidebar()
 
     # Thiết lập Timer: Mỗi 1 giây cộng tài nguyên, mỗi 3 giây bóng tối lan
     RESOURCE_EVENT = pygame.USEREVENT + 1
     DARKNESS_EVENT = pygame.USEREVENT + 2
     pygame.time.set_timer(RESOURCE_EVENT, 1000)  # 1 giây
     pygame.time.set_timer(DARKNESS_EVENT, 3000)  # 3 giây
+    current_speed = 1  # toc do hien tai
 
     running = True
     while running:
         # --- 1. BẮT SỰ KIỆN CHUỘT VÀ PHÍM ---
         for event in pygame.event.get():
+            sidebar.handle_event(event, game)  # nut Pause/1x/2x/3x, Upgrade, Demolish, Build
+
+            if game.speed_multiplier != current_speed:
+                current_speed = game.speed_multiplier
+                pygame.time.set_timer(RESOURCE_EVENT, int(1000 / current_speed))
+                pygame.time.set_timer(DARKNESS_EVENT, int(3000 / current_speed))
+
+
             if event.type == pygame.QUIT:
                 running = False
 
@@ -69,11 +78,12 @@ def main():
 
             # là sự kiện nhấn chuột trái / phải để chọn ô hoặc xây Tháp Ánh Sáng
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Chuột trái: chọn ô
+                if event.button == 1:  # Chuột trái: chọn ô (chỉ tính click trong vùng bàn cờ)
                     mx, my = pygame.mouse.get_pos() # Lấy vị trí chuột
-                    row = my // TILE_SIZE # Tính hàng có nghĩa là chia vị trí y cho kích thước ô , ví dụ 150 // 50 = 3 được hàng thứ 3
-                    col = mx // TILE_SIZE
-                    game.selected_tile = game.get_tile(row, col)  # Lấy ô đã chọn
+                    if mx < SIDEBAR_X:
+                        row = my // TILE_SIZE # Tính hàng có nghĩa là chia vị trí y cho kích thước ô , ví dụ 150 // 50 = 3 được hàng thứ 3
+                        col = mx // TILE_SIZE
+                        game.selected_tile = game.get_tile(row, col)  # Lấy ô đã chọn
 
                 elif event.button == 3:  # Chuột phải: xây Tháp Ánh Sáng thử nghiệm
                     if game.selected_tile:
@@ -138,45 +148,8 @@ def main():
             pygame.draw.rect(screen, (255, 255, 0), sel_rect, 3)
 
         # --- 3. VẼ BẢNG THÔNG TIN BÊN PHẢI (SIDEBAR) ---
-        sidebar_rect = pygame.Rect(SIDEBAR_X, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT)
-        pygame.draw.rect(screen, COLOR_SIDEBAR, sidebar_rect)
-
-        # Hiển thị tài nguyên
-        res_text = (
-            f"Wood: {game.resources['wood']} | Stone: {game.resources['stone']} | "
-            f"Light: {game.resources['light']}"
-        )
-        screen.blit(title_font.render("RESOURCES", True, (255, 255, 255)), (SIDEBAR_X + 20, 20))
-        screen.blit(font.render(res_text, True, (200, 220, 200)), (SIDEBAR_X + 20, 50))
-
-        # Trạng thái Pause
-        pause_status = "PAUSED (Space to resume)" if game.is_paused else "RUNNING (Space to pause)"
-        screen.blit(font.render(pause_status, True, (255, 200, 100)), (SIDEBAR_X + 20, 80))
-
-        # Thông tin ô đang chọn
-        screen.blit(title_font.render("SELECTED TILE", True, (255, 255, 255)), (SIDEBAR_X + 20, 130))
-        if game.selected_tile:
-            st = game.selected_tile
-            building_name = st.building.name if st.building else "None"
-            screen.blit(font.render(f"Coordinates: ({st.row}, {st.col})", True, (220, 220, 220)), (SIDEBAR_X + 20, 160))
-            screen.blit(font.render(f"Terrain: {st.terrain.capitalize()}", True, (220, 220, 220)), (SIDEBAR_X + 20, 185))
-            screen.blit(font.render(f"Building: {building_name}", True, (220, 220, 220)), (SIDEBAR_X + 20, 210))
-            screen.blit(
-                font.render(
-                    f"Status: {'DARKNESS' if st.is_dark else 'Safe'}",
-                    True,
-                    (255, 100, 100) if st.is_dark else (100, 255, 100),
-                ),
-                (SIDEBAR_X + 20, 235),
-            )
-
-            cost_text = ", ".join(f"{amt} {res}" for res, amt in TowerOfLight.base_cost.items())
-            screen.blit(
-                font.render(f"[Right Click] to build Tower (Cost: {cost_text})", True, (240, 240, 150)),
-                (SIDEBAR_X + 20, 280),
-            )
-        else:
-            screen.blit(font.render("Click any tile on the board...", True, (150, 150, 150)), (SIDEBAR_X + 20, 160))
+        sidebar.update(game)
+        sidebar.draw(screen, game)
 
         pygame.display.flip()
         clock.tick(60)

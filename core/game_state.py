@@ -21,6 +21,7 @@ class GameState:
         self.is_paused = False
         self.game_over = False
         self.selected_tile = None
+        self.speed_multiplier = 1  # 1x/2x/3x, đổi qua set_speed()
 
         # 3. Sinh bản đồ địa hình (TV6 đã thay code)
         terrain_map = generate_map(GRID_ROWS, GRID_COLS)
@@ -32,12 +33,10 @@ class GameState:
                 row_tiles.append(Tile(r, c, terrain))
             self.grid.append(row_tiles)
 
-        # 4. Góc bóng tối khởi điểm (dưới-trái)
-        self.grid[GRID_ROWS - 1][0].is_dark = True
-        self.grid[GRID_ROWS - 2][0].is_dark = True
-        self.grid[GRID_ROWS - 1][1].is_dark = True
+        # Không tự gán is_dark ở đây nữa — spread_darkness() tự tối dần từ góc
+        # dưới-trái theo _SPIRAL_ORDER ngay từ nhịp gọi đầu tiên (core/rules.py).
 
-    # get_tile làm 
+    # get_tile làm
     def get_tile(self, row, col):
         """Trả về Tile tại (row, col), hoặc None nếu ngoài bàn cờ."""
         if 0 <= row < GRID_ROWS and 0 <= col < GRID_COLS:
@@ -79,6 +78,18 @@ class GameState:
             return False
         return tile.building.upgrade(self.resources)
 
+    def remove_building(self, row, col):
+        """Phá bỏ công trình tại (row, col). Trả về True nếu có công trình để phá."""
+        tile = self.get_tile(row, col)
+        if tile is None or tile.building is None:
+            return False
+        tile.building = None
+        return True
+
+    def set_speed(self, multiplier):
+        """Đặt tốc độ mô phỏng (1, 2, 3...). Ảnh hưởng tick_resources() và spread_darkness()."""
+        self.speed_multiplier = multiplier
+
     def update_light(self):
         """Cập nhật trạng thái is_lighted của các ô dựa trên Tháp Ánh Sáng."""
         rules.update_light(self.grid)
@@ -89,15 +100,15 @@ class GameState:
             return
         for row in self.grid:
             for tile in row:
-                if tile.building is not None and not tile.is_dark: 
+                if tile.building is not None and not tile.is_dark:
                     for res, amount in tile.building.produces.items():
-                        self.resources[res] = self.resources.get(res, 0) + amount
+                        self.resources[res] = self.resources.get(res, 0) + amount * self.speed_multiplier
 
     def spread_darkness(self):
-        """Lan bóng tối thêm 1 nhịp. trong core/rules.py."""
+        """Lan bóng tối thêm 1 ô. Tốc độ nhanh/chậm do main.py tự rút ngắn/kéo dài nhịp gọi."""
         if self.is_paused:
             return
-        rules.spread_darkness(self.grid)
+        rules.spread_darkness(self.grid)   # bo vong for lap N lan
         self._check_game_over()
 
     def _check_game_over(self):
