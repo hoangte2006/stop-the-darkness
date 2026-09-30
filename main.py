@@ -6,150 +6,159 @@ from core.constants import *
 from core.game_state import GameState
 from entities.building import TowerOfLight
 from services.storage import save_game, load_game
+from services.audio import AudioManager
+from ui import renderer
 from ui.sidebar import Sidebar
+from ui.menu import Menu
+from ui.renderer import TileMapRenderer
 
 
 def main():
-    pygame.init()  # Khởi tạo Pygame
+    pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Stop The Darkness - Python Prototype")
     clock = pygame.time.Clock()
 
-    game = GameState()
-    sidebar = Sidebar()
+    audio = AudioManager()
+    audio.load_default_sounds()
+    audio.play_music("bgm.ogg")
 
-    # Thiết lập Timer: Mỗi 1 giây cộng tài nguyên, mỗi 3 giây bóng tối lan
+    menu = Menu(screen)
+
+    renderer = TileMapRenderer(TILE_SIZE)
+    renderer.load_sprites()
+
+
     RESOURCE_EVENT = pygame.USEREVENT + 1
     DARKNESS_EVENT = pygame.USEREVENT + 2
-    pygame.time.set_timer(RESOURCE_EVENT, 1000)  # 1 giây
-    pygame.time.set_timer(DARKNESS_EVENT, 3000)  # 3 giây
-    current_speed = 1  # toc do hien tai
+
+    # Trang thai man hinh: "start_menu" | "playing" | "game_over"
+    screen_state = "start_menu"
+    game = None
+    sidebar = None
+    current_speed = 1
+
+    def start_new_game():
+        nonlocal game, sidebar, current_speed
+        game = GameState()
+        sidebar = Sidebar()
+        current_speed = 1
+        pygame.time.set_timer(RESOURCE_EVENT, 1000)
+        pygame.time.set_timer(DARKNESS_EVENT, 3000)
 
     running = True
     while running:
-        # --- 1. BẮT SỰ KIỆN CHUỘT VÀ PHÍM ---
+        # --- 1. BAT SU KIEN CHUOT VA PHIM ---
         for event in pygame.event.get():
-            sidebar.handle_event(event, game)  # nut Pause/1x/2x/3x, Upgrade, Demolish, Build
-
-            if game.speed_multiplier != current_speed:
-                current_speed = game.speed_multiplier
-                pygame.time.set_timer(RESOURCE_EVENT, int(1000 / current_speed))
-                pygame.time.set_timer(DARKNESS_EVENT, int(3000 / current_speed))
-
-
             if event.type == pygame.QUIT:
                 running = False
+                continue
 
-            # là sự kiện cộng tài nguyên
-            elif event.type == RESOURCE_EVENT:
-                game.tick_resources()
+            if screen_state == "start_menu":
+                action = menu.handle_start_menu_event(event)
+                if action == "start":
+                    audio.play_sound("button")
+                    start_new_game()
+                    screen_state = "playing"
+                elif action == "quit":
+                    running = False
 
-            elif event.type == DARKNESS_EVENT:
-                game.spread_darkness()
-                if game.game_over:
-                    game.is_paused = True  # Tạm dừng game khi thua
+            elif screen_state == "playing":
+                sidebar.handle_event(event, game, audio)  # nut Pause/1x/2x/3x, Upgrade, Demolish, Build
 
-            # Là sự kiện nhấn phím Space để tạm dừng / tiếp tục game
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    game.is_paused = not game.is_paused
+                if game.speed_multiplier != current_speed:
+                    current_speed = game.speed_multiplier
+                    pygame.time.set_timer(RESOURCE_EVENT, int(1000 / current_speed))
+                    pygame.time.set_timer(DARKNESS_EVENT, int(3000 / current_speed))
 
-                elif event.key == pygame.K_s:
+                # là sự kiện cộng tài nguyên
+                if event.type == RESOURCE_EVENT:
+                    game.tick_resources()
 
-                    save_game(game.to_dict())
-                    print("Game saved!")
-                    print("File: saves/save.json")
+                elif event.type == DARKNESS_EVENT:
+                    game.spread_darkness()
+                    if game.game_over:
+                        game.is_paused = True  # Tạm dừng game khi thua
+                        audio.play_sound("bell")
+                        screen_state = "game_over"
 
-                elif event.key == pygame.K_l:
-                    try:
-                        loaded_data = load_game("saves/save.json")
+                # Là sự kiện nhấn phím Space để tạm dừng / tiếp tục game
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        game.is_paused = not game.is_paused
 
-                        # Khôi phục resources
-                        game.load_from_dict(loaded_data)
-                        print("Game loaded!")
+                    elif event.key == pygame.K_s:
+                        save_game(game.to_dict())
+                        print("Game saved!")
                         print("File: saves/save.json")
 
-                    except FileNotFoundError:
-                        print("Không tìm thấy save game!")
-                        print("Hãy nhấn S để lưu game trước.")
+                    elif event.key == pygame.K_l:
+                        try:
+                            loaded_data = load_game("saves/save.json")
+                            game.load_from_dict(loaded_data)
+                            print("Game loaded!")
+                            print("File: saves/save.json")
 
-                    except Exception as e:
-                        print(f"Load game thất bại: {e}")
+                        except FileNotFoundError:
+                            print("Không tìm thấy save game!")
+                            print("Hãy nhấn S để lưu game trước.")
 
-            # là sự kiện nhấn chuột trái / phải để chọn ô hoặc xây Tháp Ánh Sáng
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Chuột trái: chọn ô (chỉ tính click trong vùng bàn cờ)
-                    mx, my = pygame.mouse.get_pos() # Lấy vị trí chuột
-                    if mx < SIDEBAR_X:
-                        row = my // TILE_SIZE # Tính hàng có nghĩa là chia vị trí y cho kích thước ô , ví dụ 150 // 50 = 3 được hàng thứ 3
-                        col = mx // TILE_SIZE
-                        game.selected_tile = game.get_tile(row, col)  # Lấy ô đã chọn
+                        except Exception as e:
+                            print(f"Load game thất bại: {e}")
 
-                elif event.button == 3:  # Chuột phải: xây Tháp Ánh Sáng thử nghiệm
-                    if game.selected_tile:
-                        game.add_building(
-                            game.selected_tile.row, game.selected_tile.col, TowerOfLight.key
-                        )
-            # Crtl + S để lưu game, Ctrl + L để load game
-            elif event.type == pygame.KEYDOWN and pygame.key.get_mods() & pygame.KMOD_CTRL:
-                if event.key == pygame.K_s:
-                    save_game(game.to_dict())
-                    print("Game saved!")
-                    print("File: saves/save.json")
+                # là sự kiện nhấn chuột trái / phải để chọn ô hoặc xây Tháp Ánh Sáng
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:  # Chuột trái: chọn ô (chỉ tính click trong vùng bàn cờ)
+                        mx, my = pygame.mouse.get_pos()
+                        if mx < SIDEBAR_X:
+                            row = my // TILE_SIZE
+                            col = mx // TILE_SIZE
+                            game.selected_tile = game.get_tile(row, col)
 
-                elif event.key == pygame.K_l:
-                    try:
-                        loaded_data = load_game("saves/save.json")
-                        game.load_from_dict(loaded_data)
-                        print("Game loaded!")
-                        print("File: saves/save.json")
+                    elif event.button == 3:  # Chuột phải: xây Tháp Ánh Sáng thử nghiệm
+                        if game.selected_tile:
+                            built = game.add_building(
+                                game.selected_tile.row, game.selected_tile.col, TowerOfLight.key
+                            )
+                            if built:
+                                audio.play_sound("build")
 
-                    except FileNotFoundError:
-                        print("Không tìm thấy save game!")
-                        print("Hãy nhấn Ctrl + S để lưu game trước.")
+            elif screen_state == "game_over":
+                action = menu.handle_game_over_event(event)
+                if action == "restart":
+                    audio.play_sound("button")
+                    start_new_game()
+                    screen_state = "playing"
 
-                    except Exception as e:
-                        print(f"Load game thất bại: {e}")
+        # --- 2. VE TOAN BO MAN HINH ---
+        if screen_state == "start_menu":
+            menu.update()
+            menu.draw_start_menu()
 
-        # --- 2. VẼ TOÀN BỘ MÀN HÌNH ---
-        screen.fill(COLOR_BG)
+        elif screen_state == "playing":
+            screen.fill(COLOR_BG)
 
-        # Vẽ bàn cờ GRID_ROWS x GRID_COLS
-        for r in range(GRID_ROWS):
-            for c in range(GRID_COLS):
-                tile = game.grid[r][c]
-                rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            # Vẽ bàn cờ GRID_ROWS x GRID_COLS
+            renderer.draw(screen, game)
 
-                # Chọn màu theo địa hình hoặc bóng tối
-                if tile.is_dark:
-                    color = COLOR_DARKNESS
-                elif tile.building is not None:
-                    color = COLOR_LIGHT_TOWER
-                elif tile.terrain == "forest":
-                    color = COLOR_FOREST
-                elif tile.terrain == "rock":
-                    color = COLOR_ROCK
-                elif tile.terrain == "water":
-                    color = COLOR_WATER
-                else:
-                    color = COLOR_GRASS
 
-                pygame.draw.rect(screen, color, rect)
-                pygame.draw.rect(screen, COLOR_GRID_LINE, rect, 1)  # Viền ô
+            # Vẽ viền vàng cho ô đang được chọn
+            if game.selected_tile:
+                sel_rect = pygame.Rect(
+                    game.selected_tile.col * TILE_SIZE,
+                    game.selected_tile.row * TILE_SIZE,
+                    TILE_SIZE,
+                    TILE_SIZE,
+                )
+                pygame.draw.rect(screen, (255, 255, 0), sel_rect, 3)
 
-        # Vẽ viền vàng cho ô đang được chọn
-        if game.selected_tile:
-            sel_rect = pygame.Rect(
-                game.selected_tile.col * TILE_SIZE,
-                game.selected_tile.row * TILE_SIZE,
-                TILE_SIZE,
-                TILE_SIZE,
-            )
-            pygame.draw.rect(screen, (255, 255, 0), sel_rect, 3)
+            # --- 3. VẼ BẢNG THÔNG TIN BÊN PHẢI (SIDEBAR) ---
+            sidebar.update(game)
+            sidebar.draw(screen, game)
 
-        # --- 3. VẼ BẢNG THÔNG TIN BÊN PHẢI (SIDEBAR) ---
-        sidebar.update(game)
-        sidebar.draw(screen, game)
+        elif screen_state == "game_over":
+            menu.update()
+            menu.draw_game_over()
 
         pygame.display.flip()
         clock.tick(60)

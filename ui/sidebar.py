@@ -73,7 +73,7 @@ class Sidebar:
         return all(current_resources.get(resource_name, 0) >= required_amount 
                    for resource_name, required_amount in required_cost.items())
 
-    def handle_event(self, event: pygame.event.Event, game_state) -> None:
+    def handle_event(self, event: pygame.event.Event, game_state, audio=None) -> None:
         if self.btn_pause.handle_event(event):
             game_state.is_paused = not game_state.is_paused
         elif self.btn_1x.handle_event(event):
@@ -95,14 +95,18 @@ class Sidebar:
 
         if selected_tile.building:
             if self.upgrade_button.handle_event(event):
-                game_state.upgrade_building(selected_tile.row, selected_tile.col)
+                upgraded = game_state.upgrade_building(selected_tile.row, selected_tile.col)
+                if upgraded and audio:
+                    audio.play_sound("build")
             elif self.demolish_button.handle_event(event):
-                if hasattr(game_state, 'remove_building'): 
+                if hasattr(game_state, 'remove_building'):
                     game_state.remove_building(selected_tile.row, selected_tile.col)
         elif not selected_tile.is_dark:
             for building_key, button in self.build_buttons.items():
                 if button.handle_event(event):
-                    game_state.add_building(selected_tile.row, selected_tile.col, building_key)
+                    built = game_state.add_building(selected_tile.row, selected_tile.col, building_key)
+                    if built and audio:
+                        audio.play_sound("build")
                     break
 
     def update(self, game_state) -> None:

@@ -19,7 +19,7 @@ class Tile(Entity):
             "row": self.row, 
             "col": self.col,
             "terrain": self.terrain,
-            "building": self.building.key if self.building else None,
+            "building": self.building.to_dict() if self.building else None,
             "is_dark": self.is_dark,
             "is_lighted": self.is_lighted,
         }

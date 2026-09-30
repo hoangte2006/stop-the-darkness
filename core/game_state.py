@@ -26,6 +26,7 @@ class GameState:
         # 3. Sinh bản đồ địa hình (TV6 đã thay code)
         terrain_map = generate_map(GRID_ROWS, GRID_COLS)
         self.grid = []
+
         for r in range(GRID_ROWS):
             row_tiles = []
             for c in range(GRID_COLS):
@@ -50,7 +51,7 @@ class GameState:
         trình, đang bị bóng tối, hoặc không đủ tài nguyên.
         """
         tile = self.get_tile(row, col)
-        building_cls = BUILDING_TYPES.get(building_key)
+        building_cls = BUILDING_TYPES.get(building_key) 
         if tile is None or building_cls is None:
             return False
         if tile.is_dark or tile.building is not None:
@@ -133,7 +134,6 @@ class GameState:
         }
 
     def load_from_dict(self, data):
-        """Nạp lại trạng thái game từ dict do TV4 đọc từ file JSON (đảo ngược của to_dict)."""
         self.resources = dict(data["resources"])
         for r, row in enumerate(data["grid"]):
             for c, tile_data in enumerate(row):
@@ -141,5 +141,12 @@ class GameState:
                 tile.terrain = tile_data["terrain"]
                 tile.is_dark = tile_data["is_dark"]
                 tile.is_lighted = tile_data["is_lighted"]
-                building_key = tile_data["building"]
-                tile.building = BUILDING_TYPES[building_key](r, c) if building_key else None
+
+                building_data = tile_data["building"]
+                if building_data:  
+                    building_cls = BUILDING_TYPES[building_data["key"]] 
+                    new_building = building_cls(r, c)
+                    new_building.level = building_data["level"]
+                    tile.building = new_building
+                else:
+                    tile.building = None

@@ -95,6 +95,9 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
   động (gọi theo nhịp `RESOURCE_EVENT` của main.py).
 - `spread_darkness() -> None` — lan bóng tối thêm 1 ô theo thứ tự vòng xoáy
   (gọi theo nhịp `DARKNESS_EVENT` của main.py), rồi tự kiểm tra điều kiện thua.
+- `update_light() -> None` — tính lại `is_lighted` cho mọi ô dựa trên các
+  Tháp Ánh Sáng hiện có (gọi `rules.update_light()`). Nên gọi lại sau mỗi lần
+  `add_building`/`upgrade_building`/`remove_building` ảnh hưởng tới TowerOfLight.
 - `to_dict() -> dict` — serialize toàn bộ state, đưa cho `services/storage.save_game`.
 - `load_from_dict(data: dict) -> None` — nạp lại state từ dict do
   `services/storage.load_game` đọc được.
@@ -125,9 +128,24 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
 
 ## Interface các bạn khác cần cung cấp (Leader gọi vào)
 
-- **TV2 — `ui/renderer.py`**: `draw(screen, game: GameState) -> None` — vẽ
-  bàn cờ dựa trên `game.grid` (dùng `tile.terrain`, `tile.building.icon_key`,
-  `tile.is_dark`, `tile.is_lighted`).
+- **TV2 — `ui/renderer.py`**: **đã hoàn thành** — class `TileMapRenderer(tile_size)`
+  với:
+  - `load_sprites() -> None` — nạp toàn bộ sprite 1 lần, gọi trước vòng lặp
+    game (đọc file trong `assets/images/ui/sprites/`, map bằng dict
+    `SPRITE_FILES` trong file này).
+  - `sprite_key_for_tile(tile: Tile) -> str` — quyết định 1 tile nên vẽ bằng
+    sprite nào: `is_dark` → `"darkness"`, có `building` → `"building"`,
+    ngược lại dùng `tile.terrain`.
+  - `draw(screen, game: GameState) -> None` — vẽ toàn bộ `game.grid` lên
+    `screen`, dùng đúng sprite cho từng ô qua `sprite_key_for_tile`.
+
+  Ví dụ dùng trong `main.py`:
+  ```python
+  renderer = TileMapRenderer(TILE_SIZE)   # 1 lan truoc vong lap
+  renderer.load_sprites()
+  ...
+  renderer.draw(screen, game)             # moi frame
+  ```
 - **TV3 — `ui/button.py`**: class `Button` với `handle_event(event) -> bool`
   (trả `True` nếu bị click), `is_clicked(mouse_pos) -> bool`, và
   `draw(screen) -> None`.
@@ -155,9 +173,13 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
 - **TV4 — `services/storage.py`**: `save_game(data: dict, filename: str) -> bool`
   (nhận `game.to_dict()`), `load_game(filename: str) -> dict` (trả dict để
   truyền vào `game.load_from_dict(...)`).
-- **TV5 — `services/audio.py`**: class `AudioManager` với `play_bgm(name: str) -> None`,
-  `play_sfx(name: str) -> None`, `set_volume(value: float) -> None`. Đồng
-  thời hiện màn hình Game Over khi `game.game_over` là `True`.
+- **TV5 — `services/audio.py`**: **đã hoàn thành** — class `AudioManager` với
+  `load_default_sounds() -> None`, `play_music(filename: str, loop=True) -> None`,
+  `play_sound(name: str) -> None`, `set_music_volume`/`set_sound_volume(value: float) -> None`.
+  **`ui/menu.py`**: **đã hoàn thành** — class `Menu(screen)` với
+  `draw_start_menu()`, `draw_game_over()`, `handle_start_menu_event(event) -> "start"|"quit"|None`,
+  `handle_game_over_event(event) -> "restart"|None`. Cả 2 đã ghép vào
+  `main.py` (màn hình Start → Playing → Game Over).
 - **TV6 — `core/map_generator.py`**: `generate_map(rows: int = GRID_ROWS, cols: int = GRID_COLS) -> list[list[str]]`
   — **đã hoàn thành** (Cellular Automata gom cụm, đúng tỷ lệ 50/25/15/10%
   grass/forest/water/rock). `game_state.py` gọi thẳng vào hàm này, không cần
