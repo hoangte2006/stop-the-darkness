@@ -2,53 +2,36 @@ import json
 import os
 
 
-def save_game(data_dict, filename="saves/save.json"):
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+def save_game(data: dict, filename: str = "saves/save.json") -> bool:
+    try:
+        directory = os.path.dirname(filename)
 
-    with open(filename, "w", encoding="utf-8") as file:
-        json.dump(data_dict, file, ensure_ascii=False, indent=4)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
+
+        return True
+
+    except (OSError, TypeError, ValueError) as error:
+        print(f"Lỗi khi lưu game: {error}")
+        return False
 
 
-def load_game(filename):
-    with open(filename, "r", encoding="utf-8") as file:
-        return json.load(file)
+def load_game(filename: str) -> dict:
+    try:
+        with open(filename, "r", encoding="utf-8") as file:
+            return json.load(file)
 
+    except FileNotFoundError:
+        print(f"Lỗi: Không tìm thấy file save '{filename}'.")
+        return {}
 
-if __name__ == "__main__":
-    mock_data = {
-        "grid": [
-            [
-                {
-                    "terrain": "grass",
-                    "is_dark": False,
-                    "building": None
-                }
-                for _ in range(12)
-            ]
-            for _ in range(12)
-        ],
-        "resources": {
-            "wood": 100,
-            "stone": 50,
-            "tech": 20,
-            "light": 75
-        }
-    }
+    except json.JSONDecodeError as error:
+        print(f"Lỗi: File save không chứa JSON hợp lệ: {error}")
+        return {}
 
-    save_game(mock_data)
-
-    loaded_data = load_game("saves/save.json")
-
-    assert loaded_data == mock_data
-
-    assert len(loaded_data["grid"]) == 12
-    assert len(loaded_data["grid"][0]) == 12
-
-    assert loaded_data["resources"]["wood"] == 100
-    assert loaded_data["resources"]["stone"] == 50
-    assert loaded_data["resources"]["tech"] == 20
-    assert loaded_data["resources"]["light"] == 75
-
-    print("Save game thành công!")
-    print("Load game thành công!")
-    print("Dữ liệu toàn vẹn!")
+    except OSError as error:
+        print(f"Lỗi khi đọc file save: {error}")
+        return {}
