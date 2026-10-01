@@ -74,6 +74,17 @@ def is_adjacent_to(grid, row, col, terrain):
             return True
     return False
 
+
+def count_adjacent_terrain(grid, row, col, terrain):
+    """Đếm trong 4 ô kề (row, col) có bao nhiêu ô thuộc địa hình `terrain`."""
+    rows, cols = len(grid), len(grid[0])
+    count = 0
+    for nr, nc in ((row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1)):
+        if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc].terrain == terrain:
+            count += 1
+    return count
+
+
 # hàm update_light() được chuyển sang core/rules.py để tách riêng luật game khỏi trạng thái game.
 # nhiệm vụ của hàm này là cập nhật trạng thái is_lighted của các ô dựa trên Tháp Ánh Sáng.
 def update_light(grid):
@@ -92,6 +103,7 @@ def update_light(grid):
                         if isinstance(neighbor_tile.building, TowerOfLight):
                             tile.is_lighted = True
                             break
+
 
 def is_darkness_finished():
     """Bong toi da lan het toan bo vong xoay (khong con o nao de lan tiep)."""

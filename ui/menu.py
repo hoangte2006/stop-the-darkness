@@ -202,18 +202,19 @@ class Menu:
 
         self.screen.blit(info, info_rect)
 
-    def draw_game_over(self):
+    def draw_game_over(self, won=False):
         """
         Draw the game over screen.
         """
         self.draw_background()
 
-        # Game over title
+        title_text = "YOU WIN!" if won else "GAME OVER"
         title = self.title_font.render(
-            "GAME OVER",
+            title_text,
             True,
             (235, 235, 240)
         )
+
 
         title_rect = title.get_rect(
             center=(

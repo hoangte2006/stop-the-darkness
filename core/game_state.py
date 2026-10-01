@@ -20,6 +20,8 @@ class GameState:
         # 2. Trạng thái UI dùng chung
         self.is_paused = False
         self.game_over = False
+        self.game_won = False
+
         self.selected_tile = None
         self.speed_multiplier = 1  # 1x/2x/3x, đổi qua set_speed()
 
@@ -94,16 +96,28 @@ class GameState:
     def update_light(self):
         """Cập nhật trạng thái is_lighted của các ô dựa trên Tháp Ánh Sáng."""
         rules.update_light(self.grid)
+
         
     def tick_resources(self):
         """Cộng tài nguyên mỗi giây dựa trên các công trình đang hoạt động (chưa bị bóng tối)."""
         if self.is_paused:
             return
-        for row in self.grid:
-            for tile in row:
+
+        self.resources["tech"] = self.resources.get("tech", 0) + 1 * self.speed_multiplier
+
+        for r, row in enumerate(self.grid):
+            for c, tile in enumerate(row):
                 if tile.building is not None and not tile.is_dark:
-                    for res, amount in tile.building.produces.items():
-                        self.resources[res] = self.resources.get(res, 0) + amount * self.speed_multiplier
+                    building = tile.building
+                    bonus_multiplier = 1.0
+                    if building.boost_terrain:
+                        adjacent_count = rules.count_adjacent_terrain(self.grid, r, c, building.boost_terrain)
+                        bonus_multiplier += adjacent_count * building.boost_per_tile
+                    for res, amount in building.produces.items():
+                        self.resources[res] = self.resources.get(res, 0) + amount * bonus_multiplier * self.speed_multiplier
+
+        self._check_win_condition()
+
 
     def spread_darkness(self):
         """Lan bóng tối thêm 1 ô. Tốc độ nhanh/chậm do main.py tự rút ngắn/kéo dài nhịp gọi."""
@@ -116,6 +130,13 @@ class GameState:
         """Kiểm tra thua: bóng tối đã lan hết mức có thể (đã duyệt hết bản đồ)."""
         if rules.is_darkness_finished():
             self.game_over = True
+
+    def _check_win_condition(self):
+        """Kiểm tra thắng: đủ Đá+Ánh Sáng (kiểu nâng Vòng Tròn Đá) hoặc đủ Tech (kiểu Viện Nghiên Cứu)."""
+        enough_stone_and_light = self.resources.get("stone", 0) >= 100 and self.resources.get("light", 0) >= 100
+        enough_tech = self.resources.get("tech", 0) >= 100
+        if enough_stone_and_light or enough_tech:
+            self.game_won = True
 
 
     def to_dict(self):
@@ -131,10 +152,13 @@ class GameState:
             "resources": dict(self.resources),
             "grid": grid_data,
             "game_over": self.game_over,
+            "game_won": self.game_won,
         }
 
     def load_from_dict(self, data):
         self.resources = dict(data["resources"])
+        self.game_over = data.get("game_over", False)
+        self.game_won = data.get("game_won", False)
         for r, row in enumerate(data["grid"]):
             for c, tile_data in enumerate(row):
                 tile = self.grid[r][c]

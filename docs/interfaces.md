@@ -45,6 +45,13 @@ Hằng số dùng chung: `GRID_ROWS`, `GRID_COLS`, `TILE_SIZE`, `SIDEBAR_X`,
 - `base_produces` (`dict[str, int]`) — sản lượng ở level 1.
 - `icon_key` (`str`) — tên sprite để TV2 tra trong bộ ảnh.
 - `max_level` (`int`) — cấp tối đa được phép nâng.
+- `boost_terrain` (`str | None`) — loại địa hình kề giúp tăng sản lượng, vd
+  `"forest"` (Woodcutter), `"rock"` (Quarry). `None` = không có buff ô kề
+  (mặc định ở `Building` cha, `TowerOfLight` không override).
+- `boost_per_tile` (`float`) — mỗi ô kề đúng `boost_terrain` cộng thêm bấy
+  nhiêu % sản lượng. Hiện tại `0.25` (+25%/ô) cho cả Woodcutter và Quarry.
+  Công thức áp dụng ở `GameState.tick_resources()`:
+  `sản_lượng_thực = base_produces × level × (1 + số_ô_kề_đúng_loại × boost_per_tile)`.
 
 **Thuộc tính/method của mỗi instance (mỗi công trình đã xây):**
 - `level` (`int`) — cấp hiện tại, bắt đầu từ `1`, tăng dần qua `upgrade()`.
@@ -96,8 +103,9 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
 - `spread_darkness() -> None` — lan bóng tối thêm 1 ô theo thứ tự vòng xoáy
   (gọi theo nhịp `DARKNESS_EVENT` của main.py), rồi tự kiểm tra điều kiện thua.
 - `update_light() -> None` — tính lại `is_lighted` cho mọi ô dựa trên các
-  Tháp Ánh Sáng hiện có (gọi `rules.update_light()`). Nên gọi lại sau mỗi lần
-  `add_building`/`upgrade_building`/`remove_building` ảnh hưởng tới TowerOfLight.
+  Tháp Ánh Sáng hiện có (gọi `rules.update_light()`). **main.py đã gọi hàm
+  này mỗi frame** (trước `renderer.draw()`) nên luôn đồng bộ, không cần tự
+  gọi thêm sau khi xây/nâng cấp/phá TowerOfLight.
 - `to_dict() -> dict` — serialize toàn bộ state, đưa cho `services/storage.save_game`.
 - `load_from_dict(data: dict) -> None` — nạp lại state từ dict do
   `services/storage.load_game` đọc được.
@@ -109,6 +117,13 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
 - `is_paused: bool`
 - `game_over: bool` — `True` khi bóng tối đã lan hết mức có thể. TV5 dùng để
   hiện màn hình Game Over.
+- `game_won: bool` — `True` khi thắng game, kiểm tra ở cuối mỗi
+  `tick_resources()`. Thắng khi (a) `stone ≥ 100` **và** `light ≥ 100`
+  (giả lập nâng Vòng Tròn Đá), hoặc (b) `tech ≥ 100` (`tech` tự tăng
+  `1 × speed_multiplier` mỗi nhịp, không cần building riêng — giả lập tích
+  luỹ nghiên cứu theo thời gian). `main.py` check cờ này sau mỗi
+  `tick_resources()`, chuyển `screen_state` sang `"game_over"` và gọi
+  `menu.draw_game_over(won=game.game_won)` để hiện đúng "YOU WIN!"/"GAME OVER".
 - `speed_multiplier: int` — 1/2/3, đổi qua `set_speed()`.
 
 ## `core/rules.py` — logic thuật toán, `GameState` gọi vào
@@ -123,6 +138,10 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
 - `is_adjacent_to(grid, row: int, col: int, terrain: str) -> bool` — kiểm
   tra 4 ô kề `(row, col)` có ô nào thuộc loại địa hình `terrain` không (dùng
   cho luật xây theo ô kề, chưa gắn vào `add_building`).
+- `count_adjacent_terrain(grid, row: int, col: int, terrain: str) -> int` —
+  đếm trong 4 ô kề có bao nhiêu ô thuộc địa hình `terrain` (0-4). Dùng ở
+  `GameState.tick_resources()` để tính buff ô kề của building
+  (`boost_terrain`/`boost_per_tile`, xem phần `entities/building.py`).
 
 ---
 
@@ -177,9 +196,11 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
   `load_default_sounds() -> None`, `play_music(filename: str, loop=True) -> None`,
   `play_sound(name: str) -> None`, `set_music_volume`/`set_sound_volume(value: float) -> None`.
   **`ui/menu.py`**: **đã hoàn thành** — class `Menu(screen)` với
-  `draw_start_menu()`, `draw_game_over()`, `handle_start_menu_event(event) -> "start"|"quit"|None`,
+  `draw_start_menu()`, `draw_game_over(won: bool = False)` (hiện "YOU WIN!"
+  nếu `won=True`, "GAME OVER" nếu `False` — gọi bằng
+  `menu.draw_game_over(won=game.game_won)`), `handle_start_menu_event(event) -> "start"|"quit"|None`,
   `handle_game_over_event(event) -> "restart"|None`. Cả 2 đã ghép vào
-  `main.py` (màn hình Start → Playing → Game Over).
+  `main.py` (màn hình Start → Playing → Game Over/Win).
 - **TV6 — `core/map_generator.py`**: `generate_map(rows: int = GRID_ROWS, cols: int = GRID_COLS) -> list[list[str]]`
   — **đã hoàn thành** (Cellular Automata gom cụm, đúng tỷ lệ 50/25/15/10%
   grass/forest/water/rock). `game_state.py` gọi thẳng vào hàm này, không cần
@@ -189,11 +210,14 @@ giao tiếp" dùng chung cho cả team — không sửa nếu không phải Lead
 
 ## Việc còn lại của Leader (chưa xong, không chặn ai)
 
-- **Cơ chế buff theo ô kề (adjacency bonus)** — dùng `rules.is_adjacent_to()`
-  đã có sẵn, nối vào `tick_resources()` để công trình cạnh nhau tự cộng thêm
-  sản lượng. Đây là nền tảng để thêm các loại building mới (Village,
-  PortVillage...) sau này.
-- Điều kiện thắng (vd sống sót đủ N nhịp) — chưa chốt số, sẽ thêm
-  `game.game_won` tương tự `game_over`.
+- ~~Cơ chế buff theo ô kề (adjacency bonus)~~ — **đã xong** (Giai đoạn 2):
+  `rules.count_adjacent_terrain()` + `Building.boost_terrain`/`boost_per_tile`
+  + `GameState.tick_resources()`. Xem phần `entities/building.py` và
+  `core/rules.py` ở trên.
+- ~~Điều kiện thắng~~ — **đã xong** (Giai đoạn 2): `game.game_won`, xem phần
+  thuộc tính public của `GameState` ở trên.
 - `entities/building.py`: gắn luật xây theo ô kề (vd Woodcutter phải cạnh
-  rừng) vào `add_building`, nếu nhóm muốn giới hạn vị trí xây theo địa hình.
+  rừng) vào `add_building`, nếu nhóm muốn giới hạn vị trí xây theo địa hình —
+  **vẫn chưa làm**, dùng `rules.is_adjacent_to()` khi cần.
+- Building mới (Village, PortVillage...) tận dụng cơ chế buff vừa có — ý
+  tưởng cho Giai đoạn 3, chưa phân việc.

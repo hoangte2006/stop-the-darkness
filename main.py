@@ -74,6 +74,11 @@ def main():
                 # là sự kiện cộng tài nguyên
                 if event.type == RESOURCE_EVENT:
                     game.tick_resources()
+                    if game.game_won:
+                        game.is_paused = True
+                        audio.play_sound("bell")
+                        screen_state = "game_over"
+
 
                 elif event.type == DARKNESS_EVENT:
                     game.spread_darkness()
@@ -138,6 +143,8 @@ def main():
         elif screen_state == "playing":
             screen.fill(COLOR_BG)
 
+            game.update_light()
+
             # Vẽ bàn cờ GRID_ROWS x GRID_COLS
             renderer.draw(screen, game)
 
@@ -158,7 +165,8 @@ def main():
 
         elif screen_state == "game_over":
             menu.update()
-            menu.draw_game_over()
+            menu.draw_game_over(won=game.game_won)
+
 
         pygame.display.flip()
         clock.tick(60)
