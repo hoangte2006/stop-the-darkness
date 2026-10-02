@@ -91,7 +91,7 @@ class Sidebar:
     def _initialize_build_buttons(self) -> None:
         start_y_position = 275
         for index, (building_key, building_class) in enumerate(BUILDING_TYPES.items()):
-            button_y = start_y_position + index * 52
+            button_y = start_y_position + index * 70 
 
             eng_name = getattr(building_class, "name", "Building")
             if eng_name in ["Nhà đốn gỗ", "Woodcutter"]:
@@ -113,16 +113,18 @@ class Sidebar:
     def _get_buff_info(self, game_state, row: int, col: int, building_key: str) -> str:
         target_terrain = None
         key_str = str(building_key).lower()
-        if "lumber" in key_str or "wood" in key_str:
+
+        if any(w in key_str for w in ["lumber", "wood", "đốn gỗ", "gỗ"]):
             target_terrain = "forest"
-        elif "quarry" in key_str or "stone" in key_str or "mine" in key_str:
+        elif any(w in key_str for w in ["quarry", "stone", "đá"]):
             target_terrain = "rock"
 
         if target_terrain and hasattr(rules, "count_adjacent_terrain"):
             count = rules.count_adjacent_terrain(game_state.grid, row, col, target_terrain)
-            if count > 0:
-                buff_percent = count * 20
-                return f"+{buff_percent}% do {count} o ke"
+            buff_percent = count * 20  # +20% mỗi ô kề
+            terrain_name = "Rừng" if target_terrain == "forest" else "Đá"
+            return f"+{buff_percent}% do {count} ô {terrain_name} kề"
+            
         return ""
 
     def handle_event(self, event: pygame.event.Event, game_state, audio=None) -> None:
@@ -181,8 +183,9 @@ class Sidebar:
     def update(self, game_state) -> None:
         mouse_position = pygame.mouse.get_pos()
 
-        if getattr(game_state, "is_game_over", False):
-            if getattr(game_state, "is_victory", False):
+        # Đổi thành game_over và game_won cho đúng chuẩn hợp đồng của team
+        if getattr(game_state, "game_over", False):
+            if getattr(game_state, "game_won", False):
                 self.stats["wins"] = max(1, self.stats["wins"])
             else:
                 self.stats["losses"] = max(1, self.stats["losses"])
@@ -279,11 +282,12 @@ class Sidebar:
             b_max = getattr(b, "max_level", 3)
             title = f"{b_name} (Lv {b_lvl}/{b_max})"
             screen.blit(self.font_title.render(title, True, (100, 220, 255)), (self.sidebar_rect.x + 15, 250))
-
             buff_info = self._get_buff_info(game_state, selected_tile.row, selected_tile.col, getattr(b, "key", b_name))
             if buff_info:
                 screen.blit(self.font_small.render(f"Buff: {buff_info}", True, (120, 255, 120)), (self.sidebar_rect.x + 15, 275))
-
+            else:
+                # Thêm dòng này để báo +0% khi xây sai chỗ
+                screen.blit(self.font_small.render("Buff: +0% (Không có ô kề phù hợp)", True, (160, 160, 160)), (self.sidebar_rect.x + 15, 275))
             if self.upgrade_button.is_hovered and b_lvl < b_max and hasattr(b, "cost_for_next_level"):
                 cost_dict = b.cost_for_next_level()
                 cost_str = " | ".join([f"{v} {k}" for k, v in cost_dict.items()])
