@@ -232,9 +232,19 @@ class Sidebar:
             button.is_hovered = button.rect.collidepoint(mouse_position)
             if selected_tile and getattr(selected_tile, "building", None) is None and not getattr(selected_tile, "is_dark", False):
                 b_class = BUILDING_TYPES[building_key]
-                button.is_enabled = self._has_enough_resources(
-                    getattr(b_class, "base_cost", {}), getattr(game_state, "resources", {})
+                
+                # 1. Kiểm tra xem có đủ tài nguyên không
+                has_res = self._has_enough_resources(
+                    getattr(b_class, "base_cost", {}), 
+                    getattr(game_state, "resources", {})
                 )
+                
+                # 2. Kiểm tra xem loại đất (terrain) có khớp với build_terrain không
+                req_terrain = getattr(b_class, "build_terrain", None)
+                is_correct_terrain = (req_terrain is None) or (getattr(selected_tile, "terrain", None) == req_terrain)
+                
+                # Nút chỉ sáng lên (Enable) khi thỏa mãn CẢ 2 điều kiện
+                button.is_enabled = has_res and is_correct_terrain
             else:
                 button.is_enabled = False
 
