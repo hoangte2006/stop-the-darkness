@@ -92,17 +92,64 @@ def main():
                     if event.key == pygame.K_SPACE:
                         game.is_paused = not game.is_paused
 
-                    elif event.key == pygame.K_s:
-                        save_game(game.to_dict())
-                        print("Game saved!")
-                        print("File: saves/save.json")
+                    elif event.key == pygame.K_q:
 
-                    elif event.key == pygame.K_l:
+                        save_game(game.to_dict(), 1)
+                        print("Game saved!")
+                        print("File: saves/save-slot1.json")
+
+                    elif event.key == pygame.K_w:
+
+                        save_game(game.to_dict(), 2)
+                        print("Game saved!")
+                        print("File: saves/save-slot2.json")
+
+                    elif event.key == pygame.K_e:
+
+                        save_game(game.to_dict(), 3)
+                        print("Game saved!")
+                        print("File: saves/save-slot3.json")
+
+                    elif event.key == pygame.K_1:
                         try:
-                            loaded_data = load_game("saves/save.json")
+                            loaded_data = load_game(1)
+
+                            # Khôi phục resources
                             game.load_from_dict(loaded_data)
                             print("Game loaded!")
-                            print("File: saves/save.json")
+                            print("File: saves/save-slot1.json")
+
+                        except FileNotFoundError:
+                            print("Không tìm thấy save game!")
+                            print("Hãy nhấn S để lưu game trước.")
+
+                        except Exception as e:
+                            print(f"Load game thất bại: {e}")
+
+                    elif event.key == pygame.K_2:
+                        try:
+                            loaded_data = load_game(2)
+
+                            # Khôi phục resources
+                            game.load_from_dict(loaded_data)
+                            print("Game loaded!")
+                            print("File: saves/save-slot2.json")
+
+                        except FileNotFoundError:
+                            print("Không tìm thấy save game!")
+                            print("Hãy nhấn S để lưu game trước.")
+
+                        except Exception as e:
+                            print(f"Load game thất bại: {e}")
+
+                    elif event.key == pygame.K_3:
+                        try:
+                            loaded_data = load_game(3)
+
+                            # Khôi phục resources
+                            game.load_from_dict(loaded_data)
+                            print("Game loaded!")
+                            print("File: saves/save-slot3.json")
 
                         except FileNotFoundError:
                             print("Không tìm thấy save game!")

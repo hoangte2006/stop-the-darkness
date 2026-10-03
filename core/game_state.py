@@ -148,29 +148,24 @@ class GameState:
                 row_data.append(tile.to_dict())
             grid_data.append(row_data)
 
+        progress = rules.get_darkness_progress()
+        
         return {
             "resources": dict(self.resources),
             "grid": grid_data,
             "game_over": self.game_over,
-            "game_won": self.game_won,
+            "progress": progress,
         }
 
     def load_from_dict(self, data):
+        """Nạp lại trạng thái game từ dict do TV4 đọc từ file JSON (đảo ngược của to_dict)."""
         self.resources = dict(data["resources"])
-        self.game_over = data.get("game_over", False)
-        self.game_won = data.get("game_won", False)
         for r, row in enumerate(data["grid"]):
             for c, tile_data in enumerate(row):
                 tile = self.grid[r][c]
                 tile.terrain = tile_data["terrain"]
                 tile.is_dark = tile_data["is_dark"]
                 tile.is_lighted = tile_data["is_lighted"]
-
-                building_data = tile_data["building"]
-                if building_data:  
-                    building_cls = BUILDING_TYPES[building_data["key"]] 
-                    new_building = building_cls(r, c)
-                    new_building.level = building_data["level"]
-                    tile.building = new_building
-                else:
-                    tile.building = None
+                building_key = tile_data["building"]
+                tile.building = BUILDING_TYPES[building_key](r, c) if building_key else None
+        rules.set_darkness_progress(data["progress"])

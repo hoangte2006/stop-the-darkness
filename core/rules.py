@@ -64,6 +64,19 @@ def spread_darkness(grid):
 
     _progress += 1
 
+def get_darkness_progress():
+    """Lấy tiến trình lan bóng tối hiện tại."""
+    return _progress
+
+
+def set_darkness_progress(progress):
+    """Khôi phục tiến trình lan bóng tối."""
+    global _progress
+
+    if not isinstance(progress, int) or not 0 <= progress <= len(_SPIRAL_ORDER):
+        raise ValueError("Tiến trình bóng tối không hợp lệ")
+
+    _progress = progress
 
 
 def is_adjacent_to(grid, row, col, terrain):
