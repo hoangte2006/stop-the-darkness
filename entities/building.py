@@ -18,6 +18,9 @@ class Building(Entity):
     base_produces = {}        # Sản lượng ở level 1, vd {"wood": 2}
     icon_key = "default"      # Tên sprite trong renderer
     max_level = 3
+    boost_terrain = None     # địa hình kề giúp tăng sản lượng, vd "forest". None = không có buff
+    boost_per_tile = 0.0     # mỗi ô kề đúng địa hình cộng thêm bao nhiêu % sản lượng
+
 
     def __init__(self, row, col):
         super().__init__(entity_id=f"{self.key}_{row}_{col}", row=row, col=col)
@@ -71,18 +74,22 @@ class Building(Entity):
 class Woodcutter(Building):
     key = "woodcutter"
     name = "Nhà đốn gỗ"
-    base_cost = {"wood": 30}
+    base_cost = {"wood": 2}
     base_produces = {"wood": 2}
     icon_key = "woodcutter"
+    boost_terrain = "forest"
+    boost_per_tile = 0.25
+
 
 
 class Quarry(Building):
     key = "quarry"
     name = "Mỏ đá"
-    base_cost = {"wood": 20, "stone": 10}
+    base_cost = {"wood": 8}
     base_produces = {"stone": 1}
     icon_key = "quarry"
-
+    boost_terrain = "rock"
+    boost_per_tile = 0.25
 
 class TowerOfLight(Building):
     key = "tower_of_light"
