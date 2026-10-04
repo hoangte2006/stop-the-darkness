@@ -202,15 +202,16 @@ class Menu:
 
         self.screen.blit(info, info_rect)
 
-    def draw_game_over(self):
+    def draw_game_over(self, won=False):
         """
-        Draw the game over screen.
+        Draw the game over screen / victory screen.
         """
         self.draw_background()
 
-        # Game over title
+        # Game title
+        title_text = "YOU WIN!" if won else "GAME OVER"
         title = self.title_font.render(
-            "GAME OVER",
+            title_text,
             True,
             (235, 235, 240)
         )
@@ -224,9 +225,14 @@ class Menu:
 
         self.screen.blit(title, title_rect)
 
-        # Game over message
+        # Game message
+        message_text = (
+            "The light has survived."
+            if won
+            else "The darkness has taken over."
+        )
         message = self.subtitle_font.render(
-            "The darkness has taken over.",
+            message_text,
             True,
             (170, 170, 185)
         )
@@ -314,3 +320,4 @@ class Menu:
                 return "restart"
 
         return None
+    
