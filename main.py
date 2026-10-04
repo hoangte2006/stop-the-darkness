@@ -31,10 +31,11 @@ def main():
 
     RESOURCE_EVENT = pygame.USEREVENT + 1
     DARKNESS_EVENT = pygame.USEREVENT + 2
+    DARKNESS_INTERVAL_MS = 5000   # 1 o toi moi 5 giay o toc do 1x
 
     # Trang thai man hinh: "start_menu" | "playing" | "game_over"
     screen_state = "start_menu"
-    game = None
+    game = None 
     sidebar = None
     current_speed = 1
 
@@ -44,7 +45,7 @@ def main():
         sidebar = Sidebar()
         current_speed = 1
         pygame.time.set_timer(RESOURCE_EVENT, 1000)
-        pygame.time.set_timer(DARKNESS_EVENT, 3000)
+        pygame.time.set_timer(DARKNESS_EVENT, DARKNESS_INTERVAL_MS)
 
     running = True
     while running:
@@ -69,7 +70,7 @@ def main():
                 if game.speed_multiplier != current_speed:
                     current_speed = game.speed_multiplier
                     pygame.time.set_timer(RESOURCE_EVENT, int(1000 / current_speed))
-                    pygame.time.set_timer(DARKNESS_EVENT, int(3000 / current_speed))
+                    pygame.time.set_timer(DARKNESS_EVENT, int(DARKNESS_INTERVAL_MS / current_speed))
 
                 # là sự kiện cộng tài nguyên
                 if event.type == RESOURCE_EVENT:
@@ -91,6 +92,11 @@ def main():
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         game.is_paused = not game.is_paused
+
+                    elif event.key == pygame.K_F1:
+                        # DEV: +100 moi tai nguyen de thu thang nhanh. XOA truoc ngay thuyet trinh.
+                        for res in game.resources:
+                            game.resources[res] += 100
 
                     elif event.key == pygame.K_s:
                         save_game(game.to_dict())

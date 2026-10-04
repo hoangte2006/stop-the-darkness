@@ -20,7 +20,8 @@ class Building(Entity):
     max_level = 3
     boost_terrain = None     # địa hình kề giúp tăng sản lượng, vd "forest". None = không có buff
     boost_per_tile = 0.0     # mỗi ô kề đúng địa hình cộng thêm bao nhiêu % sản lượng
-
+    build_terrain = None     # địa hình BẮT BUỘC để xây được, vd "forest". None = xây đâu cũng được
+    buildable = True         # False = có sẵn từ đầu game, người chơi không tự xây được
 
     def __init__(self, row, col):
         super().__init__(entity_id=f"{self.key}_{row}_{col}", row=row, col=col)
@@ -74,34 +75,59 @@ class Building(Entity):
 class Woodcutter(Building):
     key = "woodcutter"
     name = "Nhà đốn gỗ"
-    base_cost = {"wood": 2}
-    base_produces = {"wood": 2}
+    base_cost = {"wood": 5}
+    base_produces = {"wood": 10}  # mỗi PHÚT ở level 1
     icon_key = "woodcutter"
     boost_terrain = "forest"
-    boost_per_tile = 0.25
-
+    boost_per_tile = 0.20
+    build_terrain = "forest"      # chỉ xây được TRÊN ô rừng
 
 
 class Quarry(Building):
     key = "quarry"
     name = "Mỏ đá"
-    base_cost = {"wood": 8}
-    base_produces = {"stone": 1}
+    base_cost = {"wood": 15}
+    base_produces = {"stone": 4}  # mỗi PHÚT ở level 1
     icon_key = "quarry"
     boost_terrain = "rock"
     boost_per_tile = 0.25
+    build_terrain = "rock"        # chỉ xây được TRÊN ô đá
+
 
 class TowerOfLight(Building):
     key = "tower_of_light"
     name = "Tháp ánh sáng"
-    base_cost = {"wood": 30, "stone": 10}
-    base_produces = {"light": 1}
+    base_cost = {"wood": 25, "light": 15}   # light = mana
+    base_produces = {"light": 1.5}          # mỗi PHÚT ở level 1
     icon_key = "tower_of_light"
+    build_terrain = "grass"       # chỉ xây được trên đất bằng
+
+
+class MushroomHut(Building):
+    key = "mushroom_hut"
+    name = "Nhà nấm"
+    base_cost = {"wood": 20, "stone": 5}
+    base_produces = {"light": 3}  # mana, mỗi PHÚT ở level 1
+    icon_key = "mushroom_hut"
+    build_terrain = "grass"       # sau này đổi thành "mushroom" khi có địa hình rừng nấm
+
+
+class StoneCircle(Building):
+    key = "stone_circle"
+    name = "Vòng tròn đá"
+    base_cost = {"stone": 100, "light": 100}  # giá nâng lên Lv2 (hệ số cấp 1 = 1) -> nâng được là thắng
+    base_produces = {}
+    icon_key = "stone_circle"
+    max_level = 2
+    build_terrain = "grass"
+    buildable = False             # có sẵn ở tâm bản đồ, không xây thêm được
 
 
 # Registry để tra class theo `key` (dùng khi xây công trình mới hoặc load save file).
 BUILDING_TYPES = {
     Woodcutter.key: Woodcutter,
     Quarry.key: Quarry,
+    MushroomHut.key: MushroomHut,
     TowerOfLight.key: TowerOfLight,
+    StoneCircle.key: StoneCircle,
 }
