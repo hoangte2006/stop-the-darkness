@@ -89,10 +89,19 @@ class Sidebar:
         self.speed_buttons = [self.btn_pause, self.btn_1x, self.btn_2x, self.btn_3x]
 
     def _initialize_build_buttons(self) -> None:
-        start_y_position = 275
-        for index, (building_key, building_class) in enumerate(BUILDING_TYPES.items()):
-            button_y = start_y_position + index * 70 
+        # Thu gọn kích thước và khoảng cách để 4 nút nằm gọn trọn vẹn trong sidebar, không bị tràn mép dưới
+        start_y_position = 325
+        spacing = 30
+        btn_count = 0
 
+        for building_key, building_class in BUILDING_TYPES.items():
+            # Bỏ qua các công trình không được phép xây (buildable = False)
+            if getattr(building_class, "buildable", True) == False:
+                continue
+
+            button_y = start_y_position + btn_count * spacing 
+            btn_count += 1
+            
             eng_name = getattr(building_class, "name", "Building")
             if eng_name in ["Nhà đốn gỗ", "Woodcutter"]:
                 eng_name = "Lumber Camp"
@@ -102,11 +111,11 @@ class Sidebar:
                 eng_name = "Light Tower"
 
             self.build_buttons[building_key] = Button(
-                rect=(self.sidebar_rect.x + 20, button_y, self.sidebar_rect.width - 40, 32),
+                rect=(self.sidebar_rect.x + 20, button_y, self.sidebar_rect.width - 40, 26),
                 text=f"Build {eng_name}",
-                font=self.font_normal,
+                font=self.font_small,
             )
-
+            
     def _format_rates(self, rates: dict) -> str:
         names = {"wood": "gỗ", "stone": "đá", "light": "mana", "tech": "tech"}
         return " | ".join(f"{amount:.1f} {names.get(res, res)}" for res, amount in rates.items())
@@ -180,8 +189,10 @@ class Sidebar:
             for building_key, button in self.build_buttons.items():
                 if button.handle_event(event):
                     if hasattr(game_state, "add_building"):
-                        game_state.add_building(selected_tile.row, selected_tile.col, building_key)
-                    self.stats["buildings_built"] += 1
+                        if game_state.add_building(selected_tile.row, selected_tile.col, building_key):
+                            self.stats["buildings_built"] += 1
+                            if audio and hasattr(audio, "play_sound"):
+                                audio.play_sound("build")
                     break
 
     def update(self, game_state) -> None:
@@ -261,7 +272,7 @@ class Sidebar:
         res_texts = [
             f"Wood: {resources.get('wood', 0)}",
             f"Stone: {resources.get('stone', 0)}",
-            f"Light: {resources.get('light', 0)}",
+            f"Mana: {resources.get('light', 0)}",
         ]
         for index, text in enumerate(res_texts):
             screen.blit(self.font_normal.render(text, True, self.text_color), (self.sidebar_rect.x + 20, 36 + index * 18))
@@ -300,7 +311,6 @@ class Sidebar:
             if buff_info:
                 screen.blit(self.font_small.render(f"Buff: {buff_info}", True, (120, 255, 120)), (self.sidebar_rect.x + 15, 275))
             else:
-                # Thêm dòng này để báo +0% khi xây sai chỗ
                 screen.blit(self.font_small.render("Buff: +0% (Không có ô kề phù hợp)", True, (160, 160, 160)), (self.sidebar_rect.x + 15, 275))
             rates_now = game_state.production_per_minute(type(b), selected_tile.row, selected_tile.col, b_lvl)
             if rates_now:
@@ -326,23 +336,31 @@ class Sidebar:
 
         elif not is_dark:
             screen.blit(self.font_title.render("BUILDINGS", True, (240, 200, 100)), (self.sidebar_rect.x + 15, 250))
+
+            hovered_cost_str = None
+            hovered_preview_text = None
+
             for building_key, button in self.build_buttons.items():
                 button.draw(screen)
 
                 if button.is_hovered:
                     cost_dict = game_state.build_cost(building_key)
-                    cost_str = " | ".join([f"{v} {k}" for k, v in cost_dict.items()])
-                    screen.blit(self.font_small.render(f"Cost: {cost_str}", True, (255, 255, 150)), (button.rect.x, button.rect.bottom + 2))
+                    hovered_cost_str = " | ".join([f"{v} {k}" for k, v in cost_dict.items()])
 
                     preview_buff = self._get_buff_info(game_state, selected_tile.row, selected_tile.col, building_key)
                     preview_rates = game_state.production_per_minute(BUILDING_TYPES[building_key], selected_tile.row, selected_tile.col, 1)
                     preview_text = f"Sinh/phút: {self._format_rates(preview_rates)}" if preview_rates else ""
                     if preview_buff:
                         preview_text += f" ({preview_buff})"
-                    if preview_text:
-                        screen.blit(self.font_small.render(preview_text, True, (120, 255, 120)), (button.rect.x, button.rect.bottom + 14))
+                    hovered_preview_text = preview_text
 
-        self._draw_stats_modal(screen)
+            # Đặt cố định vào khoảng trống ngay dưới chữ BUILDINGS và phía trên các nút
+            if hovered_cost_str:
+                screen.blit(self.font_small.render(f"Cost: {hovered_cost_str}", True, (255, 255, 150)), (self.sidebar_rect.x + 15, 275))
+            if hovered_preview_text:
+                screen.blit(self.font_small.render(hovered_preview_text, True, (120, 255, 120)), (self.sidebar_rect.x + 15, 295))
+
+            self._draw_stats_modal(screen)
 
     def _draw_stats_modal(self, screen: pygame.Surface) -> None:
         if not self.show_stats_modal:
