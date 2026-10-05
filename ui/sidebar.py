@@ -10,7 +10,6 @@ from entities.building import BUILDING_TYPES
 from ui.button import Button
 from core import rules
 
-
 class Sidebar:
     """Lớp Sidebar chứa các thành phần giao diện hiển thị thông tin trò chơi."""
 
@@ -25,7 +24,7 @@ class Sidebar:
         self.text_color = (200, 200, 205)
         self.current_speed = 1
 
-        # Màn Thống kê / Achievements (Nhiệm vụ 3)
+        # Màn Thống kê / Achievements
         self.show_stats_modal = False
         self.stats = {
             "buildings_built": 0,
@@ -45,9 +44,9 @@ class Sidebar:
             hover_color=(55, 75, 105),
         )
 
-        # Nút đóng modal Thống kê
+        # Nút đóng modal Thống kê (tọa độ khớp chuẩn với modal)
         self.close_stats_button = Button(
-            rect=(SIDEBAR_X - 220, 410, 100, 30),
+            rect=(SIDEBAR_X - 220, 400, 100, 30),
             text="Close",
             font=self.font_normal,
             bg_color=(80, 40, 40),
@@ -89,13 +88,11 @@ class Sidebar:
         self.speed_buttons = [self.btn_pause, self.btn_1x, self.btn_2x, self.btn_3x]
 
     def _initialize_build_buttons(self) -> None:
-        # Thu gọn kích thước và khoảng cách để 4 nút nằm gọn trọn vẹn trong sidebar, không bị tràn mép dưới
         start_y_position = 325
         spacing = 30
         btn_count = 0
 
         for building_key, building_class in BUILDING_TYPES.items():
-            # Bỏ qua các công trình không được phép xây (buildable = False)
             if getattr(building_class, "buildable", True) == False:
                 continue
 
@@ -107,6 +104,8 @@ class Sidebar:
                 eng_name = "Lumber Camp"
             elif eng_name in ["Mỏ đá", "Quarry"]:
                 eng_name = "Stone Quarry"
+            elif eng_name in ["Nhà nấm", "Mushroom Hut", "MushroomHut"]:
+                eng_name = "Mushroom Hut"
             elif eng_name in ["Tháp ánh sáng", "Tower of Light"]:
                 eng_name = "Light Tower"
 
@@ -115,7 +114,7 @@ class Sidebar:
                 text=f"Build {eng_name}",
                 font=self.font_small,
             )
-            
+
     def _format_rates(self, rates: dict) -> str:
         names = {"wood": "gỗ", "stone": "đá", "light": "mana", "tech": "tech"}
         return " | ".join(f"{amount:.1f} {names.get(res, res)}" for res, amount in rates.items())
@@ -134,7 +133,8 @@ class Sidebar:
 
         if target_terrain and hasattr(rules, "count_adjacent_terrain"):
             count = rules.count_adjacent_terrain(game_state.grid, row, col, target_terrain)
-            buff_percent = count * 20  # +20% mỗi ô kề
+            percent_per_tile = 25 if target_terrain == "rock" else 20
+            buff_percent = count * percent_per_tile
             terrain_name = "Rừng" if target_terrain == "forest" else "Đá"
             return f"+{buff_percent}% do {count} ô {terrain_name} kề"
             
@@ -176,18 +176,20 @@ class Sidebar:
             return
 
         if getattr(selected_tile, "building", None):
-            if self.upgrade_button.handle_event(event):
+            if self.upgrade_button.is_enabled and self.upgrade_button.handle_event(event):
                 if hasattr(game_state, "upgrade_building"):
-                    game_state.upgrade_building(selected_tile.row, selected_tile.col)
-                cur_lvl = getattr(selected_tile.building, "level", 1)
-                if cur_lvl > self.stats["highest_level"]:
-                    self.stats["highest_level"] = cur_lvl
-            elif self.demolish_button.handle_event(event):
+                    if game_state.upgrade_building(selected_tile.row, selected_tile.col):
+                        cur_lvl = getattr(selected_tile.building, "level", 1)
+                        if cur_lvl > self.stats["highest_level"]:
+                            self.stats["highest_level"] = cur_lvl
+                        if audio and hasattr(audio, "play_sound"):
+                            audio.play_sound("build")
+            elif self.demolish_button.is_enabled and self.demolish_button.handle_event(event):
                 if hasattr(game_state, "remove_building"):
                     game_state.remove_building(selected_tile.row, selected_tile.col)
         elif not getattr(selected_tile, "is_dark", False):
             for building_key, button in self.build_buttons.items():
-                if button.handle_event(event):
+                if button.is_enabled and button.handle_event(event):
                     if hasattr(game_state, "add_building"):
                         if game_state.add_building(selected_tile.row, selected_tile.col, building_key):
                             self.stats["buildings_built"] += 1
@@ -198,12 +200,11 @@ class Sidebar:
     def update(self, game_state) -> None:
         mouse_position = pygame.mouse.get_pos()
 
-        # Đổi thành game_over và game_won cho đúng chuẩn hợp đồng của team
-        if getattr(game_state, "game_over", False):
-            if getattr(game_state, "game_won", False):
-                self.stats["wins"] = max(1, self.stats["wins"])
-            else:
-                self.stats["losses"] = max(1, self.stats["losses"])
+        # Tách kiểm tra game_won và game_over độc lập để đảm bảo ghi nhận đúng
+        if getattr(game_state, "game_won", False):
+            self.stats["wins"] = max(1, self.stats["wins"])
+        elif getattr(game_state, "game_over", False):
+            self.stats["losses"] = max(1, self.stats["losses"])
 
         if self.show_stats_modal:
             self.close_stats_button.is_hovered = self.close_stats_button.rect.collidepoint(mouse_position)
@@ -237,28 +238,25 @@ class Sidebar:
             self.upgrade_button.is_enabled = (not is_max) and can_afford
             self.upgrade_button.is_hovered = self.upgrade_button.rect.collidepoint(mouse_position)
 
-            self.demolish_button.is_enabled = True
+            # Chỉ cho phép phá nếu công trình có buildable = True
+            self.demolish_button.is_enabled = getattr(b, "buildable", True)
             self.demolish_button.is_hovered = self.demolish_button.rect.collidepoint(mouse_position)
         else:
             self.upgrade_button.is_enabled = False
+            self.upgrade_button.is_hovered = False
             self.demolish_button.is_enabled = False
+            self.demolish_button.is_hovered = False
 
         for building_key, button in self.build_buttons.items():
             button.is_hovered = button.rect.collidepoint(mouse_position)
             if selected_tile and getattr(selected_tile, "building", None) is None and not getattr(selected_tile, "is_dark", False):
                 b_class = BUILDING_TYPES[building_key]
-                
-                # 1. Kiểm tra xem có đủ tài nguyên không
                 has_res = self._has_enough_resources(
                     game_state.build_cost(building_key),
                     getattr(game_state, "resources", {})
                 )
-                
-                # 2. Kiểm tra xem loại đất (terrain) có khớp với build_terrain không
                 req_terrain = getattr(b_class, "build_terrain", None)
                 is_correct_terrain = (req_terrain is None) or (getattr(selected_tile, "terrain", None) == req_terrain)
-                
-                # Nút chỉ sáng lên (Enable) khi thỏa mãn CẢ 2 điều kiện
                 button.is_enabled = has_res and is_correct_terrain
             else:
                 button.is_enabled = False
@@ -354,13 +352,13 @@ class Sidebar:
                         preview_text += f" ({preview_buff})"
                     hovered_preview_text = preview_text
 
-            # Đặt cố định vào khoảng trống ngay dưới chữ BUILDINGS và phía trên các nút
             if hovered_cost_str:
                 screen.blit(self.font_small.render(f"Cost: {hovered_cost_str}", True, (255, 255, 150)), (self.sidebar_rect.x + 15, 275))
             if hovered_preview_text:
                 screen.blit(self.font_small.render(hovered_preview_text, True, (120, 255, 120)), (self.sidebar_rect.x + 15, 295))
 
-            self._draw_stats_modal(screen)
+        # Đặt ở cuối hàm draw để luôn hiển thị đè lên trên mọi trạng thái
+        self._draw_stats_modal(screen)
 
     def _draw_stats_modal(self, screen: pygame.Surface) -> None:
         if not self.show_stats_modal:
