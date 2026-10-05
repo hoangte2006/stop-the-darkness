@@ -1,74 +1,209 @@
-import pygame
-import sys
-import random
-import math
+"""
+Render game board bằng sprite và visual effects.
 
+Renderer chỉ chịu trách nhiệm HIỂN THỊ.
+
+Renderer KHÔNG:
+- xây building
+- nâng cấp building
+- trừ tài nguyên
+- cộng tài nguyên
+- thay đổi level
+- thay đổi GameState
+
+Renderer chỉ đọc state hiện tại của game rồi vẽ.
+"""
+
+import math
+import random
 from pathlib import Path
 
+import pygame
 
-# =========================================================
+
+# ============================================================
 # PATH
-# =========================================================
+# ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+SPRITE_DIR = BASE_DIR / "assets/images/sprites"
 
 
-# =========================================================
+# ============================================================
+# SPRITE CONFIG
+# ============================================================
+
+SPRITE_FILES = {
+    # ========================================================
+    # TERRAIN
+    # ========================================================
+
+    ("grass", 0): "ground/ground.png",
+    ("water", 0): "water/water.png",
+
+    # --------------------------------------------------------
+    # FOREST
+    # --------------------------------------------------------
+
+    ("forest", 0): "trees/tree.png",
+
+    # --------------------------------------------------------
+    # ROCK
+    # --------------------------------------------------------
+
+    ("rock", 0): "stone/stone.png",
+
+    # --------------------------------------------------------
+    # MUSHROOM TERRAIN
+    # --------------------------------------------------------
+
+    ("mushroom", 0): "mushroom/mushroom.png",
+
+    # ========================================================
+    # MUSHROOM BUILDING / FARM
+    #
+    # Hiện tại building.py bạn gửi chưa có MushroomFarm.
+    # Nhưng giữ sprite ở đây để sau này có thể dùng.
+    # ========================================================
+
+    ("mushroom", 1): "structure/mushroom-1.png",
+    ("mushroom", 2): "structure/mushroom-2.png",
+    ("mushroom", 3): "structure/mushroom-3.png",
+
+    # ========================================================
+    # WOODCUTTER
+    # ========================================================
+
+    ("woodcutter", 1): "structure/woodcutter-1.png",
+    ("woodcutter", 2): "structure/woodcutter-2.png",
+    ("woodcutter", 3): "structure/woodcutter-3.png",
+
+    # ========================================================
+    # QUARRY
+    # ========================================================
+
+    ("quarry", 1): "structure/quarry-1.png",
+    ("quarry", 2): "structure/quarry-2.png",
+    ("quarry", 3): "structure/quarry-3.png",
+
+    # ========================================================
+    # TOWER OF LIGHT
+    # ========================================================
+
+    ("tower_of_light", 1): "structure/tower_of_light-1.png",
+    ("tower_of_light", 2): "structure/tower_of_light-2.png",
+    ("tower_of_light", 3): "structure/tower_of_light-3.png",
+}
+
+
+# ============================================================
+# DARKNESS
+# ============================================================
+
+DARKNESS_FILE = "darkness/darkness.png"
+
+
+# ============================================================
+# TERRAIN ALIASES
+#
+# Chỉ dùng cho terrain.
+#
+# Building KHÔNG nằm ở đây vì building sử dụng:
+#
+#     building.icon_key
+#
+# ============================================================
+
+TERRAIN_ALIASES = {
+    "grass": "grass",
+    "ground": "grass",
+
+    "water": "water",
+
+    "forest": "forest",
+    "tree": "forest",
+
+    "rock": "rock",
+    "stone": "rock",
+
+    "mushroom": "mushroom",
+}
+
+
+# ============================================================
 # PARTICLE
-# =========================================================
+# ============================================================
 
 class Particle:
+    """
+    Hạt nhỏ bay ra khi building được upgrade.
+
+    Đây chỉ là visual effect.
+    """
+
     def __init__(self, x, y):
         self.x = x
         self.y = y
 
+        # Hướng bay ngẫu nhiên 360 độ.
         angle = random.uniform(
             0,
-            math.pi * 2
+            math.pi * 2,
         )
 
+        # Tốc độ ngẫu nhiên.
         speed = random.uniform(
             40,
-            100
+            100,
         )
 
         self.vx = (
-            math.cos(angle) * speed
+            math.cos(angle)
+            * speed
         )
 
         self.vy = (
-            math.sin(angle) * speed
+            math.sin(angle)
+            * speed
         )
 
+        # Kích thước particle.
         self.size = random.randint(
             2,
-            4
+            4,
         )
 
+        # Thời gian sống.
         self.life = random.uniform(
             0.4,
-            0.7
+            0.7,
         )
 
         self.max_life = self.life
 
+    # ========================================================
+    # UPDATE
+    # ========================================================
 
     def update(self, dt):
-
         self.x += self.vx * dt
         self.y += self.vy * dt
 
-        # Gravity nhẹ
+        # Gravity nhẹ.
         self.vy += 60 * dt
 
+        # Giảm thời gian sống.
         self.life -= dt
 
+    # ========================================================
+    # DRAW
+    # ========================================================
 
     def draw(self, surface):
-
         if self.life <= 0:
             return
 
+        # Particle mờ dần khi sắp biến mất.
         alpha = int(
             255
             * (
@@ -80,9 +215,9 @@ class Particle:
         particle_surface = pygame.Surface(
             (
                 self.size * 2,
-                self.size * 2
+                self.size * 2,
             ),
-            pygame.SRCALPHA
+            pygame.SRCALPHA,
         )
 
         pygame.draw.circle(
@@ -91,13 +226,13 @@ class Particle:
                 255,
                 230,
                 120,
-                alpha
+                alpha,
             ),
             (
                 self.size,
-                self.size
+                self.size,
             ),
-            self.size
+            self.size,
         )
 
         surface.blit(
@@ -110,1830 +245,1541 @@ class Particle:
                 int(
                     self.y
                     - self.size
-                )
-            )
+                ),
+            ),
         )
 
 
-# =========================================================
-# TILE
-# =========================================================
-
-class Tile:
-    def __init__(
-        self,
-        tile_type,
-        level=1
-    ):
-
-        self.tile_type = tile_type
-        self.level = level
-
-
-        # =================================================
-        # UPGRADE ANIMATION
-        # =================================================
-
-        self.upgrading = False
-
-        self.upgrade_animation_time = 0
-
-        self.upgrade_animation_duration = 350
-
-
-        # =================================================
-        # FLASH
-        # =================================================
-
-        self.flash_time = 0
-
-        self.flash_duration = 100
-
-
-        # =================================================
-        # DARKNESS
-        # =================================================
-
-        self.darkness = 0.0
-
-        self.darkness_target = 0.0
-
-        self.darkness_speed = 1.0
-
-
-# =========================================================
+# ============================================================
 # TILE MAP RENDERER
-# =========================================================
+# ============================================================
 
 class TileMapRenderer:
-    def __init__(
-        self,
-        tile_size=40
-    ):
 
+    def __init__(self, tile_size):
         self.tile_size = tile_size
 
-        self.tiles = {}
+        # ====================================================
+        # SPRITE CACHE
+        # ====================================================
+
+        self.sprites = {}
+
+        # ====================================================
+        # DARKNESS SPRITE
+        # ====================================================
 
         self.darkness_image = None
 
+        # ====================================================
+        # PARTICLES
+        # ====================================================
 
-    # =====================================================
+        self.particles = []
+
+        # ====================================================
+        # LEVEL CACHE
+        #
+        # Renderer ghi nhớ level nhìn thấy ở frame trước.
+        #
+        # Ví dụ:
+        #
+        #   frame trước = 1
+        #   frame hiện tại = 2
+        #
+        # => renderer biết building vừa upgrade.
+        #
+        # Renderer KHÔNG tự tăng level.
+        # ====================================================
+
+        self._known_levels = {}
+
+        # ====================================================
+        # UPGRADE EFFECT STATE
+        # ====================================================
+
+        self._upgrade_effects = {}
+
+        # ====================================================
+        # DARKNESS VISUAL STATE
+        # ====================================================
+
+        self._darkness_values = {}
+
+        # ====================================================
+        # TIME
+        # ====================================================
+
+        self._last_draw_time = None
+
+        # ====================================================
+        # GAME INSTANCE
+        #
+        # Dùng phát hiện restart/new game.
+        # ====================================================
+
+        self._current_game_id = None
+
+    # ========================================================
     # LOAD SPRITES
-    # =====================================================
+    # ========================================================
 
     def load_sprites(self):
+        """
+        Load toàn bộ sprite một lần khi game khởi động.
+        """
 
-        sprite_paths = {
+        self.sprites.clear()
 
-            # TREE
-            ("tree", 1):
-                BASE_DIR
-                / "assets/images/sprites/trees/tree-1.png",
+        for key, relative_path in SPRITE_FILES.items():
 
-            ("tree", 2):
-                BASE_DIR
-                / "assets/images/sprites/trees/tree-2.png",
+            full_path = (
+                SPRITE_DIR
+                / relative_path
+            )
 
-            ("tree", 3):
-                BASE_DIR
-                / "assets/images/sprites/trees/tree-3.png",
-
-
-            # STONE
-            ("stone", 1):
-                BASE_DIR
-                / "assets/images/sprites/stone/stone-1.png",
-
-            ("stone", 2):
-                BASE_DIR
-                / "assets/images/sprites/stone/stone-2.png",
-
-            ("stone", 3):
-                BASE_DIR
-                / "assets/images/sprites/stone/stone-3.png",
-
-
-            # BUILDING
-            ("building", 1):
-                BASE_DIR
-                / "assets/images/sprites/structure/building-1.png",
-
-            ("building", 2):
-                BASE_DIR
-                / "assets/images/sprites/structure/building-2.png",
-
-            ("building", 3):
-                BASE_DIR
-                / "assets/images/sprites/structure/building-3.png",
-
-
-            # STATIC
-            ("ground", 1):
-                BASE_DIR
-                / "assets/images/sprites/ground/ground.png",
-
-            ("water", 1):
-                BASE_DIR
-                / "assets/images/sprites/water/water.png",
-        }
-
-
-        for key, filepath in sprite_paths.items():
-
-            if not filepath.exists():
-
-                print(
-                    f"Lỗi: Không tìm thấy ảnh:"
+            if not full_path.exists():
+                raise FileNotFoundError(
+                    "Không tìm thấy sprite:\n"
+                    f"{full_path}"
                 )
 
-                print(filepath)
-
-                sys.exit()
-
-
             image = pygame.image.load(
-                str(filepath)
+                str(full_path)
             ).convert_alpha()
-
 
             image = pygame.transform.scale(
                 image,
                 (
                     self.tile_size,
-                    self.tile_size
-                )
+                    self.tile_size,
+                ),
             )
 
+            self.sprites[key] = image
 
-            self.tiles[key] = image
-
-
-        # =================================================
+        # ====================================================
         # DARKNESS
-        # =================================================
+        # ====================================================
 
         darkness_path = (
-            BASE_DIR
-            / "assets/images/sprites/darkness/darkness.png"
+            SPRITE_DIR
+            / DARKNESS_FILE
         )
 
-
         if not darkness_path.exists():
-
-            print(
-                "Lỗi: Không tìm thấy ảnh:"
+            raise FileNotFoundError(
+                "Không tìm thấy darkness sprite:\n"
+                f"{darkness_path}"
             )
-
-            print(darkness_path)
-
-            sys.exit()
-
 
         self.darkness_image = pygame.image.load(
             str(darkness_path)
         ).convert_alpha()
 
-
         self.darkness_image = pygame.transform.scale(
             self.darkness_image,
             (
                 self.tile_size,
-                self.tile_size
-            )
-        )
-
-
-    # =====================================================
-    # WHITE FLASH
-    # =====================================================
-
-    def create_flash_image(
-        self,
-        image,
-        alpha
-    ):
-
-        flash_image = image.copy()
-
-
-        white = pygame.Surface(
-            flash_image.get_size(),
-            pygame.SRCALPHA
-        )
-
-
-        white.fill(
-            (
-                255,
-                255,
-                255,
-                alpha
-            )
-        )
-
-
-        flash_image.blit(
-            white,
-            (
-                0,
-                0
+                self.tile_size,
             ),
-            special_flags=pygame.BLEND_RGBA_ADD
         )
 
+    # ========================================================
+    # DRAW WHOLE MAP
+    # ========================================================
 
-        return flash_image
-
-
-    # =====================================================
-    # DRAW TILE
-    # =====================================================
-
-    def draw_tile(
+    def draw(
         self,
-        surface,
-        tile,
-        row,
-        col
+        screen,
+        game,
     ):
+        """
+        Main chỉ cần gọi:
+
+            renderer.draw(screen, game)
+
+        Không cần:
+            renderer.update(...)
+        """
+
+        # ====================================================
+        # NEW GAME / RESTART
+        # ====================================================
+
+        game_id = id(game)
+
+        if self._current_game_id != game_id:
+
+            self._reset_visual_state()
+
+            self._current_game_id = game_id
+
+        # ====================================================
+        # DELTA TIME
+        # ====================================================
+
+        now = pygame.time.get_ticks()
+
+        if self._last_draw_time is None:
+
+            dt = 0.0
+
+        else:
+
+            delta_ms = (
+                now
+                - self._last_draw_time
+            )
+
+            # Tránh animation nhảy quá xa khi game lag.
+            delta_ms = min(
+                delta_ms,
+                100,
+            )
+
+            dt = (
+                delta_ms
+                / 1000.0
+            )
+
+        self._last_draw_time = now
+
+        # ====================================================
+        # ACTIVE TILE IDS
+        # ====================================================
+
+        active_tile_ids = set()
+
+        # ====================================================
+        # DRAW MAP
+        # ====================================================
+
+        for row in game.grid:
+
+            for tile in row:
+
+                tile_id = id(tile)
+
+                active_tile_ids.add(
+                    tile_id
+                )
+
+                # --------------------------------------------
+                # Kiểm tra building có vừa upgrade hay không.
+                # --------------------------------------------
+
+                self._check_visual_level_change(
+                    tile,
+                    now,
+                )
+
+                # --------------------------------------------
+                # Update darkness fade.
+                # --------------------------------------------
+
+                self._update_darkness_visual(
+                    tile,
+                    dt,
+                )
+
+                # --------------------------------------------
+                # Draw tile.
+                # --------------------------------------------
+
+                self._draw_tile(
+                    screen,
+                    tile,
+                    now,
+                )
+
+        # ====================================================
+        # PARTICLES
+        # ====================================================
+
+        self._update_particles(
+            dt
+        )
+
+        self._draw_particles(
+            screen
+        )
+
+        # ====================================================
+        # CLEANUP
+        # ====================================================
+
+        self._cleanup_inactive_tiles(
+            active_tile_ids
+        )
+
+    # ========================================================
+    # RESET VISUAL STATE
+    # ========================================================
+
+    def _reset_visual_state(self):
+        """
+        Reset state riêng của renderer.
+
+        Không thay đổi game.
+        """
+
+        self._known_levels.clear()
+
+        self._upgrade_effects.clear()
+
+        self._darkness_values.clear()
+
+        self.particles.clear()
+
+        self._last_draw_time = None
+
+    # ========================================================
+    # CHECK BUILDING LEVEL CHANGE
+    # ========================================================
+
+    def _check_visual_level_change(
+        self,
+        tile,
+        now,
+    ):
+        """
+        Renderer chỉ quan sát building.level.
+
+        Ví dụ:
+
+            frame trước:
+                level = 1
+
+            frame này:
+                level = 2
+
+        => chạy animation upgrade.
+
+        Renderer không biết và không quan tâm:
+            - upgrade có tốn bao nhiêu gỗ
+            - user có đủ tài nguyên không
+            - GameState xử lý như thế nào
+        """
+
+        building = getattr(
+            tile,
+            "building",
+            None,
+        )
+
+        tile_id = id(tile)
+
+        # ====================================================
+        # KHÔNG CÓ BUILDING
+        # ====================================================
+
+        if building is None:
+
+            # Nếu trước đó tile từng có building,
+            # xóa cache level cũ.
+            self._known_levels.pop(
+                tile_id,
+                None,
+            )
+
+            self._upgrade_effects.pop(
+                tile_id,
+                None,
+            )
+
+            return
+
+        # ====================================================
+        # CURRENT LEVEL
+        # ====================================================
+
+        current_level = (
+            self._get_tile_visual_level(
+                tile
+            )
+        )
+
+        previous_level = (
+            self._known_levels.get(
+                tile_id
+            )
+        )
+
+        # ====================================================
+        # LẦN ĐẦU NHÌN THẤY BUILDING
+        #
+        # Không chạy animation lúc vừa tạo building.
+        # ====================================================
+
+        if previous_level is None:
+
+            self._known_levels[
+                tile_id
+            ] = current_level
+
+            return
+
+        # ====================================================
+        # LEVEL TĂNG
+        # ====================================================
+
+        if current_level > previous_level:
+
+            self._upgrade_effects[
+                tile_id
+            ] = {
+                "start": now,
+                "duration": 350,
+            }
+
+            self._create_upgrade_particles(
+                tile.row,
+                tile.col,
+            )
+
+        # ====================================================
+        # UPDATE CACHE
+        # ====================================================
+
+        self._known_levels[
+            tile_id
+        ] = current_level
+
+    # ========================================================
+    # GET VISUAL LEVEL
+    # ========================================================
+
+    @staticmethod
+    def _get_tile_visual_level(
+        tile,
+    ):
+        """
+        Building:
+            dùng tile.building.level
+
+        Terrain:
+            dùng tile.level nếu có.
+
+        Mặc định:
+            building = 1
+            terrain = 0
+        """
+
+        building = getattr(
+            tile,
+            "building",
+            None,
+        )
+
+        if building is not None:
+
+            level = getattr(
+                building,
+                "level",
+                1,
+            )
+
+        else:
+
+            level = getattr(
+                tile,
+                "level",
+                0,
+            )
+
+        try:
+
+            return int(
+                level
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            return (
+                1
+                if building is not None
+                else 0
+            )
+
+    # ========================================================
+    # DRAW TILE
+    # ========================================================
+
+    def _draw_tile(
+        self,
+        screen,
+        tile,
+        now,
+    ):
+        """
+        Vẽ một Tile.
+        """
+
+        # ====================================================
+        # SCREEN POSITION
+        # ====================================================
 
         x = (
-            col
+            tile.col
             * self.tile_size
         )
 
         y = (
-            row
+            tile.row
             * self.tile_size
         )
 
+        # ====================================================
+        # GET SPRITE KEY
+        # ====================================================
 
         key = (
-            tile.tile_type,
-            tile.level
+            self._sprite_key_for_tile(
+                tile
+            )
         )
 
-
-        if key not in self.tiles:
-            return
-
-
-        original_image = (
-            self.tiles[key]
+        sprite = self.sprites.get(
+            key
         )
 
+        if sprite is None:
 
-        image = original_image
-
-
-        # =================================================
-        # FLASH WHITE
-        # =================================================
-
-        if tile.flash_time > 0:
-
-            flash_progress = (
-                tile.flash_time
-                / tile.flash_duration
+            raise KeyError(
+                "Renderer không tìm thấy sprite cho key "
+                f"{key}"
             )
 
+        # ====================================================
+        # UPGRADE EFFECT
+        # ====================================================
+
+        tile_id = id(tile)
+
+        effect = (
+            self._upgrade_effects.get(
+                tile_id
+            )
+        )
+
+        if effect is not None:
+
+            elapsed = (
+                now
+                - effect["start"]
+            )
+
+            duration = (
+                effect["duration"]
+            )
+
+            if elapsed < duration:
+
+                self._draw_upgrade_animation(
+                    screen,
+                    sprite,
+                    x,
+                    y,
+                    elapsed,
+                    duration,
+                )
+
+            else:
+
+                self._upgrade_effects.pop(
+                    tile_id,
+                    None,
+                )
+
+                screen.blit(
+                    sprite,
+                    (
+                        x,
+                        y,
+                    ),
+                )
+
+        # ====================================================
+        # NORMAL DRAW
+        # ====================================================
+
+        else:
+
+            screen.blit(
+                sprite,
+                (
+                    x,
+                    y,
+                ),
+            )
+
+        # ====================================================
+        # DARKNESS
+        # ====================================================
+
+        self._draw_darkness(
+            screen,
+            tile,
+            x,
+            y,
+        )
+
+    # ========================================================
+    # GET SPRITE KEY
+    # ========================================================
+
+    def _sprite_key_for_tile(
+        self,
+        tile,
+    ):
+        """
+        Chuyển tile thành sprite key.
+
+        Ví dụ:
+
+            Woodcutter level 1
+                -> ("woodcutter", 1)
+
+            Woodcutter level 2
+                -> ("woodcutter", 2)
+
+            Quarry level 1
+                -> ("quarry", 1)
+
+            TowerOfLight level 3
+                -> ("tower_of_light", 3)
+
+            Forest
+                -> ("forest", 0)
+
+            Mushroom terrain
+                -> ("mushroom", 0)
+        """
+
+        sprite_type = (
+            self._get_sprite_type(
+                tile
+            )
+        )
+
+        building = getattr(
+            tile,
+            "building",
+            None,
+        )
+
+        # ====================================================
+        # TERRAIN
+        # ====================================================
+
+        if building is None:
+
+            return (
+                sprite_type,
+                0,
+            )
+
+        # ====================================================
+        # BUILDING
+        # ====================================================
+
+        level = (
+            self._get_tile_visual_level(
+                tile
+            )
+        )
+
+        level = (
+            self._resolve_level(
+                sprite_type,
+                level,
+            )
+        )
+
+        return (
+            sprite_type,
+            level,
+        )
+
+    # ========================================================
+    # GET SPRITE TYPE
+    # ========================================================
+
+    def _get_sprite_type(
+        self,
+        tile,
+    ):
+        """
+        Xác định sprite type.
+
+        BUILDING:
+
+            Woodcutter
+            icon_key = "woodcutter"
+
+            Quarry
+            icon_key = "quarry"
+
+            TowerOfLight
+            icon_key = "tower_of_light"
+
+        TERRAIN:
+
+            grass
+            water
+            forest
+            rock
+            mushroom
+        """
+
+        building = getattr(
+            tile,
+            "building",
+            None,
+        )
+
+        # ====================================================
+        # BUILDING
+        # ====================================================
+
+        if building is not None:
+
+            # ------------------------------------------------
+            # Ưu tiên icon_key.
+            #
+            # Đây chính là field building.py dành cho renderer.
+            # ------------------------------------------------
+
+            icon_key = getattr(
+                building,
+                "icon_key",
+                None,
+            )
+
+            if icon_key:
+
+                icon_key = self._normalize_name(
+                    icon_key
+                )
+
+                # Building base có icon_key = "default".
+                # Nếu subclass quên override thì fallback sang key.
+                if icon_key != "default":
+
+                    return icon_key
+
+            # ------------------------------------------------
+            # FALLBACK: building.key
+            # ------------------------------------------------
+
+            building_key = getattr(
+                building,
+                "key",
+                None,
+            )
+
+            if building_key:
+
+                return self._normalize_name(
+                    building_key
+                )
+
+            raise ValueError(
+                "Building không có icon_key hoặc key."
+            )
+
+        # ====================================================
+        # TERRAIN
+        # ====================================================
+
+        terrain = getattr(
+            tile,
+            "terrain",
+            "grass",
+        )
+
+        terrain = self._normalize_name(
+            terrain
+        )
+
+        terrain = TERRAIN_ALIASES.get(
+            terrain,
+            terrain,
+        )
+
+        supported_terrains = {
+            "grass",
+            "water",
+            "forest",
+            "rock",
+            "mushroom",
+        }
+
+        if terrain not in supported_terrains:
+
+            raise ValueError(
+                "Terrain không được hỗ trợ: "
+                f"{terrain}"
+            )
+
+        return terrain
+
+    # ========================================================
+    # NORMALIZE NAME
+    # ========================================================
+
+    @staticmethod
+    def _normalize_name(
+        value,
+    ):
+        """
+        Chuẩn hóa String hoặc Enum.
+
+        Ví dụ:
+
+            "FOREST"
+                -> "forest"
+
+            Terrain.FOREST
+                -> "forest"
+        """
+
+        enum_value = getattr(
+            value,
+            "value",
+            value,
+        )
+
+        text = str(
+            enum_value
+        ).strip().lower()
+
+        if "." in text:
+
+            text = (
+                text.split(".")[-1]
+            )
+
+        return text
+
+    # ========================================================
+    # AVAILABLE LEVELS
+    # ========================================================
+
+    @staticmethod
+    def _available_levels(
+        sprite_type,
+    ):
+        """
+        Ví dụ:
+
+            forest:
+                [0]
+
+            rock:
+                [0]
+
+            mushroom:
+                [0, 1, 2, 3]
+
+            woodcutter:
+                [1, 2, 3]
+
+            quarry:
+                [1, 2, 3]
+
+            tower_of_light:
+                [1, 2, 3]
+        """
+
+        return sorted(
+            level
+
+            for (
+                current_type,
+                level,
+            ) in SPRITE_FILES.keys()
+
+            if (
+                current_type
+                == sprite_type
+            )
+        )
+
+    # ========================================================
+    # RESOLVE LEVEL
+    # ========================================================
+
+    def _resolve_level(
+        self,
+        sprite_type,
+        requested_level,
+    ):
+        """
+        Đảm bảo level luôn có sprite hợp lệ.
+
+        Ví dụ:
+
+            woodcutter có:
+                [1, 2, 3]
+
+            request:
+                1 -> 1
+                2 -> 2
+                3 -> 3
+                4 -> 3
+
+        Renderer không thay đổi building.level.
+        Chỉ chọn sprite gần nhất để hiển thị.
+        """
+
+        levels = (
+            self._available_levels(
+                sprite_type
+            )
+        )
+
+        if not levels:
+
+            raise KeyError(
+                "Không có sprite nào cho loại: "
+                f"{sprite_type}"
+            )
+
+        try:
+
+            requested_level = int(
+                requested_level
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            return levels[0]
+
+        # ====================================================
+        # EXACT
+        # ====================================================
+
+        if requested_level in levels:
+
+            return requested_level
+
+        # ====================================================
+        # BELOW MIN
+        # ====================================================
+
+        if requested_level < levels[0]:
+
+            return levels[0]
+
+        # ====================================================
+        # ABOVE MAX
+        # ====================================================
+
+        if requested_level > levels[-1]:
+
+            return levels[-1]
+
+        # ====================================================
+        # LEVEL BỊ THIẾU Ở GIỮA
+        # ====================================================
+
+        return min(
+            levels,
+            key=lambda level: abs(
+                level
+                - requested_level
+            ),
+        )
+
+    # ========================================================
+    # DRAW UPGRADE ANIMATION
+    # ========================================================
+
+    def _draw_upgrade_animation(
+        self,
+        screen,
+        sprite,
+        x,
+        y,
+        elapsed,
+        duration,
+    ):
+        """
+        Hiệu ứng upgrade:
+
+        1. Flash trắng
+        2. Phóng to
+        3. Nảy lên
+        4. Particle
+        """
+
+        if duration <= 0:
+
+            screen.blit(
+                sprite,
+                (
+                    x,
+                    y,
+                ),
+            )
+
+            return
+
+        # ====================================================
+        # PROGRESS
+        # ====================================================
+
+        progress = (
+            elapsed
+            / duration
+        )
+
+        progress = max(
+            0.0,
+            min(
+                1.0,
+                progress,
+            ),
+        )
+
+        # ====================================================
+        # FLASH
+        # ====================================================
+
+        image = sprite
+
+        flash_duration = 100
+
+        if elapsed < flash_duration:
+
+            flash_progress = (
+                1.0
+                - (
+                    elapsed
+                    / flash_duration
+                )
+            )
 
             flash_alpha = int(
                 180
                 * flash_progress
             )
 
-
             image = (
-                self.create_flash_image(
-                    original_image,
-                    flash_alpha
+                self._create_flash_image(
+                    sprite,
+                    flash_alpha,
                 )
             )
 
+        # ====================================================
+        # SCALE
+        #
+        # 1.0 -> 1.15 -> 1.0
+        # ====================================================
 
-        # =================================================
-        # UPGRADE ANIMATION
-        # =================================================
+        if progress < 0.5:
 
-        if tile.upgrading:
-
-            progress = (
-                tile.upgrade_animation_time
-                / tile.upgrade_animation_duration
-            )
-
-
-            # ---------------------------------------------
-            # SCALE
-            # ---------------------------------------------
-
-            if progress < 0.5:
-
-                scale = (
-                    1.0
-                    + progress * 0.30
-                )
-
-            else:
-
-                scale = (
-                    1.15
-                    - (
-                        progress - 0.5
-                    ) * 0.30
-                )
-
-
-            # ---------------------------------------------
-            # BOUNCE
-            # ---------------------------------------------
-
-            bounce_height = 8
-
-
-            bounce_offset = (
-                math.sin(
+            scale = (
+                1.0
+                + (
                     progress
-                    * math.pi
-                )
-                * bounce_height
-            )
-
-
-            new_size = int(
-                self.tile_size
-                * scale
-            )
-
-
-            animated_image = (
-                pygame.transform.smoothscale(
-                    image,
-                    (
-                        new_size,
-                        new_size
-                    )
+                    * 0.30
                 )
             )
-
-
-            draw_x = (
-                x
-                - (
-                    new_size
-                    - self.tile_size
-                ) // 2
-            )
-
-
-            draw_y = (
-                y
-                - (
-                    new_size
-                    - self.tile_size
-                ) // 2
-                - bounce_offset
-            )
-
-
-            surface.blit(
-                animated_image,
-                (
-                    draw_x,
-                    draw_y
-                )
-            )
-
 
         else:
 
-            surface.blit(
+            scale = (
+                1.15
+                - (
+                    (
+                        progress
+                        - 0.5
+                    )
+                    * 0.30
+                )
+            )
+
+        # ====================================================
+        # BOUNCE
+        # ====================================================
+
+        bounce_height = 8
+
+        bounce_offset = (
+            math.sin(
+                progress
+                * math.pi
+            )
+            * bounce_height
+        )
+
+        # ====================================================
+        # SCALE IMAGE
+        # ====================================================
+
+        new_size = max(
+            1,
+            int(
+                self.tile_size
+                * scale
+            ),
+        )
+
+        animated_image = (
+            pygame.transform.smoothscale(
                 image,
                 (
-                    x,
-                    y
-                )
-            )
-
-
-        # =================================================
-        # DARKNESS
-        # =================================================
-
-        if tile.darkness > 0:
-
-            darkness_surface = (
-                self.darkness_image.copy()
-            )
-
-
-            alpha = int(
-                255
-                * tile.darkness
-            )
-
-
-            darkness_surface.set_alpha(
-                alpha
-            )
-
-
-            surface.blit(
-                darkness_surface,
-                (
-                    x,
-                    y
-                )
-            )
-
-
-    # =====================================================
-    # DRAW MAP
-    # =====================================================
-
-    def draw(
-        self,
-        surface,
-        grid_matrix
-    ):
-
-        for row_idx, row in enumerate(
-            grid_matrix
-        ):
-
-            for col_idx, tile in enumerate(
-                row
-            ):
-
-                self.draw_tile(
-                    surface,
-                    tile,
-                    row_idx,
-                    col_idx
-                )
-
-
-# =========================================================
-# SELECTED TILE GLOW
-# =========================================================
-
-def draw_selected_tile(
-    surface,
-    row,
-    col,
-    tile_size
-):
-
-    if (
-        row is None
-        or col is None
-    ):
-        return
-
-
-    x = (
-        col
-        * tile_size
-    )
-
-    y = (
-        row
-        * tile_size
-    )
-
-
-    # =====================================================
-    # PULSE
-    # =====================================================
-
-    time = pygame.time.get_ticks()
-
-
-    pulse = (
-        math.sin(
-            time * 0.006
-        )
-        + 1
-    ) / 2
-
-
-    glow_alpha = int(
-        80
-        + pulse * 120
-    )
-
-
-    border_width = int(
-        2
-        + pulse * 2
-    )
-
-
-    glow_size = 8
-
-
-    glow_surface = pygame.Surface(
-        (
-            tile_size
-            + glow_size * 2,
-
-            tile_size
-            + glow_size * 2
-        ),
-        pygame.SRCALPHA
-    )
-
-
-    glow_rect = pygame.Rect(
-        glow_size,
-        glow_size,
-        tile_size,
-        tile_size
-    )
-
-
-    # =====================================================
-    # GLOW NGOÀI
-    # =====================================================
-
-    pygame.draw.rect(
-        glow_surface,
-        (
-            255,
-            220,
-            60,
-            glow_alpha // 4
-        ),
-        glow_rect,
-        width=8,
-        border_radius=5
-    )
-
-
-    pygame.draw.rect(
-        glow_surface,
-        (
-            255,
-            235,
-            100,
-            glow_alpha // 2
-        ),
-        glow_rect,
-        width=5,
-        border_radius=4
-    )
-
-
-    surface.blit(
-        glow_surface,
-        (
-            x - glow_size,
-            y - glow_size
-        )
-    )
-
-
-    # =====================================================
-    # VIỀN CHÍNH
-    # =====================================================
-
-    pygame.draw.rect(
-        surface,
-        (
-            255,
-            245,
-            140
-        ),
-        (
-            x + 1,
-            y + 1,
-            tile_size - 2,
-            tile_size - 2
-        ),
-        width=border_width,
-        border_radius=3
-    )
-
-
-# =========================================================
-# SPIRAL
-# =========================================================
-
-def get_spiral_coordinates(
-    rows,
-    cols
-):
-
-    coords = []
-
-
-    top = 0
-    bottom = rows - 1
-
-    left = 0
-    right = cols - 1
-
-
-    while (
-        top <= bottom
-        and left <= right
-    ):
-
-        # Trái -> phải
-
-        for i in range(
-            left,
-            right + 1
-        ):
-
-            coords.append(
-                (
-                    top,
-                    i
-                )
-            )
-
-
-        top += 1
-
-
-        # Trên -> dưới
-
-        for i in range(
-            top,
-            bottom + 1
-        ):
-
-            coords.append(
-                (
-                    i,
-                    right
-                )
-            )
-
-
-        right -= 1
-
-
-        # Phải -> trái
-
-        if top <= bottom:
-
-            for i in range(
-                right,
-                left - 1,
-                -1
-            ):
-
-                coords.append(
-                    (
-                        bottom,
-                        i
-                    )
-                )
-
-
-            bottom -= 1
-
-
-        # Dưới -> trên
-
-        if left <= right:
-
-            for i in range(
-                bottom,
-                top - 1,
-                -1
-            ):
-
-                coords.append(
-                    (
-                        i,
-                        left
-                    )
-                )
-
-
-            left += 1
-
-
-    return coords
-
-
-# =========================================================
-# PARTICLES
-# =========================================================
-
-particles = []
-
-
-def create_upgrade_particles(
-    row,
-    col,
-    tile_size
-):
-
-    center_x = (
-        col * tile_size
-        + tile_size / 2
-    )
-
-
-    center_y = (
-        row * tile_size
-        + tile_size / 2
-    )
-
-
-    particle_count = (
-        random.randint(
-            10,
-            16
-        )
-    )
-
-
-    for _ in range(
-        particle_count
-    ):
-
-        particles.append(
-            Particle(
-                center_x,
-                center_y
+                    new_size,
+                    new_size,
+                ),
             )
         )
 
+        # ====================================================
+        # GIỮ SCALE Ở TÂM TILE
+        # ====================================================
 
-def update_particles(dt):
-
-    for particle in particles:
-        particle.update(dt)
-
-
-    particles[:] = [
-
-        particle
-
-        for particle in particles
-
-        if particle.life > 0
-    ]
-
-
-def draw_particles(surface):
-
-    for particle in particles:
-
-        particle.draw(
-            surface
+        draw_x = (
+            x
+            - (
+                new_size
+                - self.tile_size
+            )
+            // 2
         )
 
-
-# =========================================================
-# UPDATE TILE
-# =========================================================
-
-def update_tiles(
-    level_matrix,
-    delta_time
-):
-
-    dt = (
-        delta_time
-        / 1000.0
-    )
-
-
-    for row in level_matrix:
-
-        for tile in row:
-
-
-            # =================================================
-            # UPGRADE
-            # =================================================
-
-            if tile.upgrading:
-
-                tile.upgrade_animation_time += (
-                    delta_time
-                )
-
-
-                if (
-                    tile.upgrade_animation_time
-                    >= tile.upgrade_animation_duration
-                ):
-
-                    tile.upgrading = False
-
-                    tile.upgrade_animation_time = 0
-
-
-            # =================================================
-            # FLASH
-            # =================================================
-
-            if tile.flash_time > 0:
-
-                tile.flash_time -= (
-                    delta_time
-                )
-
-
-                if tile.flash_time < 0:
-
-                    tile.flash_time = 0
-
-
-            # =================================================
-            # DARKNESS
-            # =================================================
-
-            if (
-                tile.darkness
-                < tile.darkness_target
-            ):
-
-                tile.darkness += (
-                    tile.darkness_speed
-                    * dt
-                )
-
-
-                if (
-                    tile.darkness
-                    > tile.darkness_target
-                ):
-
-                    tile.darkness = (
-                        tile.darkness_target
-                    )
-
-
-# =========================================================
-# UPGRADE TILE
-# =========================================================
-
-def upgrade_tile(
-    tile,
-    row,
-    col
-):
-
-    upgradeable_types = {
-        "tree",
-        "stone",
-        "building",
-    }
-
-
-    # Không phải object nâng cấp được
-    if (
-        tile.tile_type
-        not in upgradeable_types
-    ):
-        return
-
-
-    # Bóng tối quá nhiều
-    if tile.darkness > 0.5:
-
-        print(
-            "Không thể nâng cấp: "
-            "ô đang bị bóng tối chiếm."
+        draw_y = (
+            y
+            - (
+                new_size
+                - self.tile_size
+            )
+            // 2
+            - int(
+                bounce_offset
+            )
         )
 
-        return
-
-
-    # Max level
-    if tile.level >= 3:
-
-        print(
-            f"{tile.tile_type} "
-            "đã đạt level tối đa!"
-        )
-
-        return
-
-
-    # Đang animation
-    if tile.upgrading:
-        return
-
-
-    # =====================================================
-    # LEVEL UP
-    # =====================================================
-
-    tile.level += 1
-
-
-    # =====================================================
-    # EFFECT 1 - BOUNCE
-    # =====================================================
-
-    tile.upgrading = True
-
-    tile.upgrade_animation_time = 0
-
-
-    # =====================================================
-    # EFFECT 2 - FLASH
-    # =====================================================
-
-    tile.flash_time = (
-        tile.flash_duration
-    )
-
-
-    # =====================================================
-    # EFFECT 3 - PARTICLES
-    # =====================================================
-
-    create_upgrade_particles(
-        row,
-        col,
-        TILE_SIZE
-    )
-
-
-    print(
-        f"{tile.tile_type} "
-        f"đã nâng lên level "
-        f"{tile.level}"
-    )
-
-
-# =========================================================
-# DRAW SIDE PANEL
-# =========================================================
-
-def draw_side_panel(
-    surface,
-    selected_tile,
-    panel_rect,
-    font_title,
-    font_normal,
-    font_button
-):
-
-    # =====================================================
-    # BACKGROUND
-    # =====================================================
-
-    pygame.draw.rect(
-        surface,
-        (
-            28,
-            31,
-            38
-        ),
-        panel_rect
-    )
-
-
-    # Đường ngăn cách map / panel
-
-    pygame.draw.line(
-        surface,
-        (
-            80,
-            84,
-            95
-        ),
-        (
-            panel_rect.x,
-            0
-        ),
-        (
-            panel_rect.x,
-            panel_rect.height
-        ),
-        2
-    )
-
-
-    # =====================================================
-    # CHƯA CHỌN TILE
-    # =====================================================
-
-    if selected_tile is None:
-
-        text = font_normal.render(
-            "Hãy nâng cấp công trình nhanh nào!",
-            True,
+        screen.blit(
+            animated_image,
             (
-                190,
-                190,
-                190
-            )
+                draw_x,
+                draw_y,
+            ),
         )
 
+    # ========================================================
+    # CREATE FLASH IMAGE
+    # ========================================================
 
-        text_rect = text.get_rect(
-            center=(
-                panel_rect.centerx,
-                80
-            )
+    @staticmethod
+    def _create_flash_image(
+        image,
+        alpha,
+    ):
+        """
+        Tạo bản sao sprite có hiệu ứng trắng sáng.
+        """
+
+        flash_image = (
+            image.copy()
         )
 
-
-        surface.blit(
-            text,
-            text_rect
+        white_surface = pygame.Surface(
+            flash_image.get_size(),
+            pygame.SRCALPHA,
         )
 
-
-        return None
-
-
-    # =====================================================
-    # TITLE
-    # =====================================================
-
-    names = {
-        "tree": "TREE",
-        "stone": "STONE",
-        "building": "BUILDING",
-    }
-
-
-    display_name = names.get(
-        selected_tile.tile_type,
-        selected_tile.tile_type.upper()
-    )
-
-
-    title_surface = (
-        font_title.render(
-            display_name,
-            True,
+        white_surface.fill(
             (
                 255,
-                240,
-                170
+                255,
+                255,
+                alpha,
             )
         )
-    )
 
-
-    title_rect = (
-        title_surface.get_rect(
-            center=(
-                panel_rect.centerx,
-                65
-            )
-        )
-    )
-
-
-    surface.blit(
-        title_surface,
-        title_rect
-    )
-
-
-    # =====================================================
-    # LEVEL
-    # =====================================================
-
-    level_surface = (
-        font_normal.render(
-            f"Level: {selected_tile.level} / 3",
-            True,
+        flash_image.blit(
+            white_surface,
             (
-                230,
-                230,
-                230
-            )
-        )
-    )
-
-
-    level_rect = (
-        level_surface.get_rect(
-            center=(
-                panel_rect.centerx,
-                115
-            )
-        )
-    )
-
-
-    surface.blit(
-        level_surface,
-        level_rect
-    )
-
-
-    # =====================================================
-    # SAU NÀY THÊM THÔNG TIN
-    # =====================================================
-
-    placeholder = (
-        font_normal.render(
-            "Thông tin nâng cấp sẽ thêm sau",
-            True,
-            (
-                140,
-                145,
-                155
-            )
-        )
-    )
-
-
-    placeholder_rect = (
-        placeholder.get_rect(
-            center=(
-                panel_rect.centerx,
-                165
-            )
-        )
-    )
-
-
-    surface.blit(
-        placeholder,
-        placeholder_rect
-    )
-
-
-    # =====================================================
-    # BUTTON
-    # =====================================================
-
-    button_width = (
-        panel_rect.width
-        - 60
-    )
-
-    button_height = 52
-
-
-    button_rect = pygame.Rect(
-        panel_rect.x + 30,
-        panel_rect.bottom - 90,
-        button_width,
-        button_height
-    )
-
-
-    mouse_pos = (
-        pygame.mouse.get_pos()
-    )
-
-
-    hovering = (
-        button_rect.collidepoint(
-            mouse_pos
-        )
-    )
-
-
-    can_upgrade = True
-
-
-    button_text = "NÂNG CẤP"
-
-
-    # =====================================================
-    # BUTTON STATE
-    # =====================================================
-
-    if selected_tile.level >= 3:
-
-        can_upgrade = False
-
-        button_text = (
-            "ĐÃ MAX LEVEL"
+                0,
+                0,
+            ),
+            special_flags=pygame.BLEND_RGBA_ADD,
         )
 
-
-    elif selected_tile.darkness > 0.5:
-
-        can_upgrade = False
-
-        button_text = (
-            "BỊ BÓNG TỐI CHIẾM"
-        )
-
-
-    elif selected_tile.upgrading:
-
-        can_upgrade = False
-
-        button_text = (
-            "ĐANG NÂNG CẤP..."
-        )
-
-
-    # =====================================================
-    # BUTTON COLOR
-    # =====================================================
-
-    if not can_upgrade:
-
-        button_color = (
-            75,
-            78,
-            85
-        )
-
-
-    elif hovering:
-
-        button_color = (
-            205,
-            164,
-            45
-        )
-
-
-    else:
-
-        button_color = (
-            177,
-            137,
-            32
-        )
-
-
-    # Shadow
-
-    shadow_rect = (
-        button_rect.copy()
-    )
-
-    shadow_rect.y += 4
-
-
-    pygame.draw.rect(
-        surface,
-        (
-            15,
-            15,
-            18
-        ),
-        shadow_rect,
-        border_radius=8
-    )
-
-
-    pygame.draw.rect(
-        surface,
-        button_color,
-        button_rect,
-        border_radius=8
-    )
-
-
-    # Button border
-
-    pygame.draw.rect(
-        surface,
-        (
-            240,
-            210,
-            110
-        ),
-        button_rect,
-        width=2,
-        border_radius=8
-    )
-
-
-    text_color = (
-        255,
-        255,
-        255
-    )
-
-
-    button_surface = (
-        font_button.render(
-            button_text,
-            True,
-            text_color
-        )
-    )
-
-
-    button_text_rect = (
-        button_surface.get_rect(
-            center=button_rect.center
-        )
-    )
-
-
-    surface.blit(
-        button_surface,
-        button_text_rect
-    )
-
-
-    # Trả button_rect về để xử lý click
-    return button_rect
-
-
-# =========================================================
-# GAME INIT
-# =========================================================
-
-pygame.init()
-
-
-ROWS = 12
-
-COLS = 16
-
-TILE_SIZE = 40
-
-
-# =========================================================
-# SIZE
-# =========================================================
-
-MAP_WIDTH = (
-    COLS
-    * TILE_SIZE
-)
-
-MAP_HEIGHT = (
-    ROWS
-    * TILE_SIZE
-)
-
-
-# Map = 2/3 màn hình
-# Panel = 1/3 màn hình
-#
-# Map width = 640
-# Panel width = 320
-# Total = 960
-
-PANEL_WIDTH = (
-    MAP_WIDTH // 2
-)
-
-
-SCREEN_WIDTH = (
-    MAP_WIDTH
-    + PANEL_WIDTH
-)
-
-
-SCREEN_HEIGHT = (
-    MAP_HEIGHT
-)
-
-
-screen = pygame.display.set_mode(
-    (
-        SCREEN_WIDTH,
-        SCREEN_HEIGHT
-    )
-)
-
-
-pygame.display.set_caption(
-    "Bóng tối lấn chiếm xoắn ốc"
-)
-
-
-# =========================================================
-# FONT
-# =========================================================
-
-font_title = pygame.font.SysFont(
-    "arial",
-    28,
-    bold=True
-)
-
-
-font_normal = pygame.font.SysFont(
-    "arial",
-    16
-)
-
-
-font_button = pygame.font.SysFont(
-    "arial",
-    18,
-    bold=True
-)
-
-
-# =========================================================
-# PANEL RECT
-# =========================================================
-
-panel_rect = pygame.Rect(
-    MAP_WIDTH,
-    0,
-    PANEL_WIDTH,
-    SCREEN_HEIGHT
-)
-
-
-# =========================================================
-# RENDERER
-# =========================================================
-
-renderer = TileMapRenderer(
-    TILE_SIZE
-)
-
-renderer.load_sprites()
-
-
-# =========================================================
-# MAP RANDOM
-# =========================================================
-
-tile_types = [
-
-    "tree",
-
-    "ground",
-
-    "water",
-
-    "stone",
-
-    "building",
-]
-
-
-level_matrix = []
-
-
-for row in range(
-    ROWS
-):
-
-    row_tiles = []
-
-
-    for col in range(
-        COLS
+        return flash_image
+
+    # ========================================================
+    # CREATE PARTICLES
+    # ========================================================
+
+    def _create_upgrade_particles(
+        self,
+        row,
+        col,
     ):
+        """
+        Tạo particle ở tâm tile.
+        """
 
-        tile_type = (
-            random.choice(
-                tile_types
-            )
+        center_x = (
+            col
+            * self.tile_size
+            + self.tile_size
+            / 2
         )
 
-
-        tile = Tile(
-            tile_type,
-            level=1
+        center_y = (
+            row
+            * self.tile_size
+            + self.tile_size
+            / 2
         )
 
-
-        row_tiles.append(
-            tile
+        particle_count = random.randint(
+            10,
+            16,
         )
 
-
-    level_matrix.append(
-        row_tiles
-    )
-
-
-# =========================================================
-# SPIRAL
-# =========================================================
-
-spiral_path = (
-    get_spiral_coordinates(
-        ROWS,
-        COLS
-    )
-)
-
-
-current_step = 0
-
-
-# =========================================================
-# DARKNESS EVENT
-# =========================================================
-
-DARKNESS_SPREAD_EVENT = (
-    pygame.USEREVENT
-    + 1
-)
-
-
-pygame.time.set_timer(
-    DARKNESS_SPREAD_EVENT,
-    2000
-)
-
-
-# =========================================================
-# SELECTED TILE
-# =========================================================
-
-selected_row = None
-
-selected_col = None
-
-selected_tile = None
-
-
-# =========================================================
-# UPGRADE BUTTON RECT
-# =========================================================
-
-upgrade_button_rect = None
-
-
-# =========================================================
-# CLOCK
-# =========================================================
-
-clock = pygame.time.Clock()
-
-
-# =========================================================
-# GAME LOOP
-# =========================================================
-
-running = True
-
-
-while running:
-
-    delta_time = (
-        clock.tick(
-            60
-        )
-    )
-
-
-    dt = (
-        delta_time
-        / 1000.0
-    )
-
-
-    # =====================================================
-    # EVENT
-    # =====================================================
-
-    for event in pygame.event.get():
-
-
-        # =================================================
-        # QUIT
-        # =================================================
-
-        if event.type == pygame.QUIT:
-
-            running = False
-
-
-        # =================================================
-        # LEFT CLICK
-        # =================================================
-
-        elif (
-            event.type
-            == pygame.MOUSEBUTTONDOWN
-            and event.button == 1
+        for _ in range(
+            particle_count
         ):
 
-            mouse_x, mouse_y = (
-                event.pos
+            self.particles.append(
+                Particle(
+                    center_x,
+                    center_y,
+                )
             )
 
+    # ========================================================
+    # UPDATE PARTICLES
+    # ========================================================
 
-            # =============================================
-            # CLICK TRONG MAP
-            # =============================================
+    def _update_particles(
+        self,
+        dt,
+    ):
+        if dt <= 0:
+            return
 
-            if mouse_x < MAP_WIDTH:
+        for particle in self.particles:
 
-                col = (
-                    mouse_x
-                    // TILE_SIZE
+            particle.update(
+                dt
+            )
+
+        # Xóa particle đã chết.
+        self.particles = [
+            particle
+
+            for particle
+            in self.particles
+
+            if particle.life > 0
+        ]
+
+    # ========================================================
+    # DRAW PARTICLES
+    # ========================================================
+
+    def _draw_particles(
+        self,
+        screen,
+    ):
+        for particle in self.particles:
+
+            particle.draw(
+                screen
+            )
+
+    # ========================================================
+    # GET DARKNESS TARGET
+    # ========================================================
+
+    @staticmethod
+    def _get_darkness_target(
+        tile,
+    ):
+        """
+        Nếu game có darkness_target:
+            dùng darkness_target.
+
+        Nếu không:
+            is_dark = True  -> 1.0
+            is_dark = False -> 0.0
+        """
+
+        explicit_target = getattr(
+            tile,
+            "darkness_target",
+            None,
+        )
+
+        if explicit_target is not None:
+
+            try:
+
+                return max(
+                    0.0,
+                    min(
+                        1.0,
+                        float(
+                            explicit_target
+                        ),
+                    ),
                 )
 
-                row = (
-                    mouse_y
-                    // TILE_SIZE
-                )
+            except (
+                TypeError,
+                ValueError,
+            ):
 
+                pass
 
-                if (
-                    0 <= row < ROWS
-                    and
-                    0 <= col < COLS
-                ):
+        if getattr(
+            tile,
+            "is_dark",
+            False,
+        ):
 
-                    tile = (
-                        level_matrix[
-                            row
-                        ][
-                            col
-                        ]
+            return 1.0
+
+        return 0.0
+
+    # ========================================================
+    # UPDATE DARKNESS VISUAL
+    # ========================================================
+
+    def _update_darkness_visual(
+        self,
+        tile,
+        dt,
+    ):
+        """
+        Fade darkness.
+
+        Chỉ thay đổi:
+            self._darkness_values
+
+        Không thay đổi tile.
+        """
+
+        tile_id = id(tile)
+
+        target = (
+            self._get_darkness_target(
+                tile
+            )
+        )
+
+        current = (
+            self._darkness_values.get(
+                tile_id
+            )
+        )
+
+        # ====================================================
+        # FIRST FRAME
+        # ====================================================
+
+        if current is None:
+
+            initial = getattr(
+                tile,
+                "darkness",
+                None,
+            )
+
+            if initial is not None:
+
+                try:
+
+                    current = float(
+                        initial
                     )
 
+                except (
+                    TypeError,
+                    ValueError,
+                ):
 
-                    selectable_types = {
-                        "tree",
-                        "stone",
-                        "building",
-                    }
-
-
-                    # =====================================
-                    # CHỈ CHỌN OBJECT CÓ THỂ UPGRADE
-                    # =====================================
-
-                    if (
-                        tile.tile_type
-                        in selectable_types
-                    ):
-
-                        selected_row = row
-
-                        selected_col = col
-
-                        selected_tile = tile
-
-
-                    # =====================================
-                    # CLICK GROUND/WATER -> BỎ CHỌN
-                    # =====================================
-
-                    else:
-
-                        selected_row = None
-
-                        selected_col = None
-
-                        selected_tile = None
-
-
-            # =============================================
-            # CLICK BUTTON UPGRADE
-            # =============================================
+                    current = target
 
             else:
 
-                if (
-                    upgrade_button_rect
-                    is not None
-                    and
-                    upgrade_button_rect.collidepoint(
-                        event.pos
-                    )
-                    and
-                    selected_tile
-                    is not None
-                ):
+                current = target
 
-                    upgrade_tile(
-                        selected_tile,
-                        selected_row,
-                        selected_col
-                    )
+        # ====================================================
+        # SPEED
+        # ====================================================
 
+        try:
 
-        # =================================================
-        # DARKNESS
-        # =================================================
+            speed = float(
+                getattr(
+                    tile,
+                    "darkness_speed",
+                    1.5,
+                )
+            )
 
-        elif (
-            event.type
-            == DARKNESS_SPREAD_EVENT
+        except (
+            TypeError,
+            ValueError,
         ):
 
-            if (
-                current_step
-                < len(
-                    spiral_path
-                )
-            ):
+            speed = 1.5
 
-                r, c = (
-                    spiral_path[
-                        current_step
-                    ]
-                )
-
-
-                tile = (
-                    level_matrix[
-                        r
-                    ][
-                        c
-                    ]
-                )
-
-
-                tile.darkness_target = 1.0
-
-
-                current_step += 1
-
-
-    # =====================================================
-    # UPDATE
-    # =====================================================
-
-    update_tiles(
-        level_matrix,
-        delta_time
-    )
-
-
-    update_particles(
-        dt
-    )
-
-
-    # =====================================================
-    # DRAW
-    # =====================================================
-
-    screen.fill(
-        (
-            0,
-            0,
-            0
+        speed = max(
+            0.0,
+            speed,
         )
-    )
 
+        # ====================================================
+        # FADE
+        # ====================================================
 
-    # =====================================================
-    # MAP
-    # =====================================================
+        if current < target:
 
-    renderer.draw(
-        screen,
-        level_matrix
-    )
+            current += (
+                speed
+                * dt
+            )
 
+            current = min(
+                current,
+                target,
+            )
 
-    # =====================================================
-    # SELECTED GLOW
-    # =====================================================
+        elif current > target:
 
-    draw_selected_tile(
-        screen,
-        selected_row,
-        selected_col,
-        TILE_SIZE
-    )
+            current -= (
+                speed
+                * dt
+            )
 
+            current = max(
+                current,
+                target,
+            )
 
-    # =====================================================
-    # PARTICLES
-    # =====================================================
+        # ====================================================
+        # CLAMP
+        # ====================================================
 
-    draw_particles(
-        screen
-    )
-
-
-    # =====================================================
-    # SIDE PANEL
-    # =====================================================
-
-    upgrade_button_rect = (
-        draw_side_panel(
-            screen,
-            selected_tile,
-            panel_rect,
-            font_title,
-            font_normal,
-            font_button
+        current = max(
+            0.0,
+            min(
+                1.0,
+                current,
+            ),
         )
-    )
 
+        self._darkness_values[
+            tile_id
+        ] = current
 
-    # =====================================================
-    # DISPLAY
-    # =====================================================
+    # ========================================================
+    # DRAW DARKNESS
+    # ========================================================
 
-    pygame.display.flip()
+    def _draw_darkness(
+        self,
+        screen,
+        tile,
+        x,
+        y,
+    ):
+        if self.darkness_image is None:
+            return
 
+        darkness = (
+            self._darkness_values.get(
+                id(tile),
+                0.0,
+            )
+        )
 
-# =========================================================
-# EXIT
-# =========================================================
+        if darkness <= 0:
+            return
 
-pygame.quit()
+        alpha = int(
+            255
+            * darkness
+        )
 
-sys.exit()
+        darkness_surface = (
+            self.darkness_image.copy()
+        )
+
+        darkness_surface.set_alpha(
+            alpha
+        )
+
+        screen.blit(
+            darkness_surface,
+            (
+                x,
+                y,
+            ),
+        )
+
+    # ========================================================
+    # CLEANUP INACTIVE TILE CACHE
+    # ========================================================
+
+    def _cleanup_inactive_tiles(
+        self,
+        active_tile_ids,
+    ):
+        """
+        Xóa cache renderer của những Tile không còn trong grid.
+        """
+
+        cached_ids = (
+            set(
+                self._known_levels.keys()
+            )
+            |
+            set(
+                self._upgrade_effects.keys()
+            )
+            |
+            set(
+                self._darkness_values.keys()
+            )
+        )
+
+        inactive_ids = (
+            cached_ids
+            - active_tile_ids
+        )
+
+        for tile_id in inactive_ids:
+
+            self._known_levels.pop(
+                tile_id,
+                None,
+            )
+
+            self._upgrade_effects.pop(
+                tile_id,
+                None,
+            )
+
+            self._darkness_values.pop(
+                tile_id,
+                None,
+            )
