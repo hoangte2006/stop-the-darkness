@@ -50,6 +50,23 @@ _SPIRAL_ORDER = build_spiral_order(GRID_ROWS, GRID_COLS)   # tinh 1 lan, dung ma
 _progress = 0   # da di toi o thu bao nhieu trong _SPIRAL_ORDER
 
 
+def reset_darkness():
+    """Đặt lại tiến độ lan bóng tối về 0 (gọi khi bắt đầu ván mới)."""
+    global _progress
+    _progress = 0
+
+
+def get_darkness_progress():
+    """Số bước vòng xoáy bóng tối đã đi qua (để lưu vào save)."""
+    return _progress
+
+
+def set_darkness_progress(value):
+    """Khôi phục tiến độ bóng tối khi load save."""
+    global _progress
+    _progress = max(0, min(int(value), len(_SPIRAL_ORDER))) # là số nguyên trong [0, 144]
+
+
 def spread_darkness(grid):
     """Toi dan 1 o theo dung thu tu vong xoay da tinh san trong _SPIRAL_ORDER."""
     global _progress

@@ -8,14 +8,17 @@ không phải Leader; báo Leader nếu cần thêm dữ liệu/hàm mới.
 from core import rules
 from core.constants import GRID_COLS, GRID_ROWS
 from core.map_generator import generate_map
-from entities.building import BUILDING_TYPES
+from entities.building import BUILDING_TYPES, StoneCircle
 from entities.tile import Tile
 
 
 class GameState:
     def __init__(self):
+        rules.reset_darkness()
+
         # 1. Kho tài nguyên người chơi
-        self.resources = {"wood": 12, "stone": 0, "tech": 0, "light": 0}
+        self.resources = {"wood": 20, "stone": 0, "tech": 0, "light": 0}
+        self._carry = {}   # phần lẻ chưa đủ 1 đơn vị của từng tài nguyên
 
         # 2. Trạng thái UI dùng chung
         self.is_paused = False
@@ -26,7 +29,14 @@ class GameState:
         self.speed_multiplier = 1  # 1x/2x/3x, đổi qua set_speed()
 
         # 3. Sinh bản đồ địa hình (TV6 đã thay code)
-        terrain_map = generate_map(GRID_ROWS, GRID_COLS)
+        while True:
+            terrain_map = generate_map(GRID_ROWS, GRID_COLS)
+            flat = [t for row in terrain_map for t in row]
+            if all(flat.count(t) >= 6 for t in ("forest", "rock", "water")):
+                break
+
+        mid_r, mid_c = GRID_ROWS // 2, GRID_COLS // 2
+        terrain_map[mid_r][mid_c] = "grass"
         self.grid = []
 
         for r in range(GRID_ROWS):
@@ -35,6 +45,8 @@ class GameState:
                 terrain = terrain_map[r][c]
                 row_tiles.append(Tile(r, c, terrain))
             self.grid.append(row_tiles)
+
+        self.grid[mid_r][mid_c].building = StoneCircle(mid_r, mid_c)
 
         # Không tự gán is_dark ở đây nữa — spread_darkness() tự tối dần từ góc
         # dưới-trái theo _SPIRAL_ORDER ngay từ nhịp gọi đầu tiên (core/rules.py).
@@ -55,6 +67,10 @@ class GameState:
         tile = self.get_tile(row, col)
         building_cls = BUILDING_TYPES.get(building_key) 
         if tile is None or building_cls is None:
+            return False
+        if not building_cls.buildable:
+            return False
+        if building_cls.build_terrain is not None and tile.terrain != building_cls.build_terrain:
             return False
         if tile.is_dark or tile.building is not None:
             return False
@@ -77,14 +93,17 @@ class GameState:
     def upgrade_building(self, row, col):
         """Nâng cấp công trình tại (row, col). Trả về True nếu thành công."""
         tile = self.get_tile(row, col)
-        if tile is None or tile.building is None:
+        if tile is None or tile.building is None or tile.is_dark:
             return False
-        return tile.building.upgrade(self.resources)
+        upgraded = tile.building.upgrade(self.resources)
+        if upgraded:
+            self._check_win_condition()
+        return upgraded
 
     def remove_building(self, row, col):
         """Phá bỏ công trình tại (row, col). Trả về True nếu có công trình để phá."""
         tile = self.get_tile(row, col)
-        if tile is None or tile.building is None:
+        if tile is None or tile.building is None or not tile.building.buildable:
             return False
         tile.building = None
         return True
@@ -103,8 +122,6 @@ class GameState:
         if self.is_paused:
             return
 
-        self.resources["tech"] = self.resources.get("tech", 0) + 1 * self.speed_multiplier
-
         for r, row in enumerate(self.grid):
             for c, tile in enumerate(row):
                 if tile.building is not None and not tile.is_dark:
@@ -114,7 +131,10 @@ class GameState:
                         adjacent_count = rules.count_adjacent_terrain(self.grid, r, c, building.boost_terrain)
                         bonus_multiplier += adjacent_count * building.boost_per_tile
                     for res, amount in building.produces.items():
-                        self.resources[res] = self.resources.get(res, 0) + amount * bonus_multiplier * self.speed_multiplier
+                        gained = self._carry.get(res, 0.0) + amount / 60 * bonus_multiplier
+                        whole = int(gained) 
+                        self._carry[res] = gained - whole
+                        self.resources[res] = self.resources.get(res, 0) + whole
 
         self._check_win_condition()
 
@@ -132,11 +152,12 @@ class GameState:
             self.game_over = True
 
     def _check_win_condition(self):
-        """Kiểm tra thắng: đủ Đá+Ánh Sáng (kiểu nâng Vòng Tròn Đá) hoặc đủ Tech (kiểu Viện Nghiên Cứu)."""
-        enough_stone_and_light = self.resources.get("stone", 0) >= 100 and self.resources.get("light", 0) >= 100
-        enough_tech = self.resources.get("tech", 0) >= 100
-        if enough_stone_and_light or enough_tech:
-            self.game_won = True
+        """Kiểm tra thắng: Vòng Tròn Đá đã được nâng lên level 2."""
+        for row in self.grid:
+            for tile in row:
+                if isinstance(tile.building, StoneCircle) and tile.building.level >= 2:
+                    self.game_won = True
+
 
 
     def to_dict(self):
@@ -153,16 +174,18 @@ class GameState:
             "grid": grid_data,
             "game_over": self.game_over,
             "game_won": self.game_won,
+            "dark_progress": rules.get_darkness_progress(),
         }
 
     def load_from_dict(self, data):
-        self.resources = dict(data["resources"])
+        self.resources = {res: int(amount) for res, amount in data["resources"].items()}
+        self._carry = {}
         self.game_over = data.get("game_over", False)
         self.game_won = data.get("game_won", False)
         for r, row in enumerate(data["grid"]):
             for c, tile_data in enumerate(row):
                 tile = self.grid[r][c]
-                tile.terrain = tile_data["terrain"]
+                tile.terrain = tile_data["terrain"] 
                 tile.is_dark = tile_data["is_dark"]
                 tile.is_lighted = tile_data["is_lighted"]
 
@@ -174,3 +197,7 @@ class GameState:
                     tile.building = new_building
                 else:
                     tile.building = None
+
+        # Save cũ không có dark_progress: ước lượng bằng số ô đã tối
+        dark_count = sum(tile.is_dark for row in self.grid for tile in row) # tính số ô đã tối
+        rules.set_darkness_progress(data.get("dark_progress", dark_count)) # khôi phục tiến độ bóng tối
