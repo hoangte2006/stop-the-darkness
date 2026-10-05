@@ -204,17 +204,17 @@ class Menu:
 
     def draw_game_over(self, won=False):
         """
-        Draw the game over screen.
+        Draw the game over screen / victory screen.
         """
         self.draw_background()
 
+        # Game title
         title_text = "YOU WIN!" if won else "GAME OVER"
         title = self.title_font.render(
             title_text,
             True,
             (235, 235, 240)
         )
-
 
         title_rect = title.get_rect(
             center=(
@@ -225,9 +225,14 @@ class Menu:
 
         self.screen.blit(title, title_rect)
 
-        # Game over message
+        # Game message
+        message_text = (
+            "The light has survived."
+            if won
+            else "The darkness has taken over."
+        )
         message = self.subtitle_font.render(
-            "The darkness has taken over.",
+            message_text,
             True,
             (170, 170, 185)
         )
@@ -315,3 +320,4 @@ class Menu:
                 return "restart"
 
         return None
+    
