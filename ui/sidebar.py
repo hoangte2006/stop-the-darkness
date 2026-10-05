@@ -107,6 +107,10 @@ class Sidebar:
                 font=self.font_normal,
             )
 
+    def _format_rates(self, rates: dict) -> str:
+        names = {"wood": "gỗ", "stone": "đá", "light": "mana", "tech": "tech"}
+        return " | ".join(f"{amount:.1f} {names.get(res, res)}" for res, amount in rates.items())
+
     def _has_enough_resources(self, required_cost: dict[str, int], current_resources: dict[str, int]) -> bool:
         return all(current_resources.get(k, 0) >= v for k, v in required_cost.items())
 
@@ -235,7 +239,7 @@ class Sidebar:
                 
                 # 1. Kiểm tra xem có đủ tài nguyên không
                 has_res = self._has_enough_resources(
-                    getattr(b_class, "base_cost", {}), 
+                    game_state.build_cost(building_key),
                     getattr(game_state, "resources", {})
                 )
                 
@@ -298,6 +302,20 @@ class Sidebar:
             else:
                 # Thêm dòng này để báo +0% khi xây sai chỗ
                 screen.blit(self.font_small.render("Buff: +0% (Không có ô kề phù hợp)", True, (160, 160, 160)), (self.sidebar_rect.x + 15, 275))
+            rates_now = game_state.production_per_minute(type(b), selected_tile.row, selected_tile.col, b_lvl)
+            if rates_now:
+                screen.blit(self.font_small.render(f"Sinh/phút: {self._format_rates(rates_now)}", True, (200, 230, 255)), (self.sidebar_rect.x + 15, 292))
+                if b_lvl < b_max:
+                    rates_next = game_state.production_per_minute(type(b), selected_tile.row, selected_tile.col, b_lvl + 1)
+                    screen.blit(self.font_small.render(f"Nâng Lv{b_lvl + 1}: {self._format_rates(rates_next)}", True, (160, 255, 160)), (self.sidebar_rect.x + 15, 306))
+                else:
+                    screen.blit(self.font_small.render("Đã đạt cấp tối đa", True, (255, 200, 120)), (self.sidebar_rect.x + 15, 306))
+            slow_per_level = getattr(type(b), "slow_per_level", 0)
+            if slow_per_level:
+                slow_text = f"Làm chậm bóng tối: +{round(slow_per_level * b_lvl * 100)}%"
+                if b_lvl < b_max:
+                    slow_text += f" (Lv{b_lvl + 1}: +{round(slow_per_level * (b_lvl + 1) * 100)}%)"
+                screen.blit(self.font_small.render(slow_text, True, (255, 230, 140)), (self.sidebar_rect.x + 15, 320))
             if self.upgrade_button.is_hovered and b_lvl < b_max and hasattr(b, "cost_for_next_level"):
                 cost_dict = b.cost_for_next_level()
                 cost_str = " | ".join([f"{v} {k}" for k, v in cost_dict.items()])
@@ -312,13 +330,17 @@ class Sidebar:
                 button.draw(screen)
 
                 if button.is_hovered:
-                    cost_dict = getattr(BUILDING_TYPES[building_key], "base_cost", {})
+                    cost_dict = game_state.build_cost(building_key)
                     cost_str = " | ".join([f"{v} {k}" for k, v in cost_dict.items()])
                     screen.blit(self.font_small.render(f"Cost: {cost_str}", True, (255, 255, 150)), (button.rect.x, button.rect.bottom + 2))
 
                     preview_buff = self._get_buff_info(game_state, selected_tile.row, selected_tile.col, building_key)
+                    preview_rates = game_state.production_per_minute(BUILDING_TYPES[building_key], selected_tile.row, selected_tile.col, 1)
+                    preview_text = f"Sinh/phút: {self._format_rates(preview_rates)}" if preview_rates else ""
                     if preview_buff:
-                        screen.blit(self.font_small.render(f"Preview: {preview_buff}", True, (120, 255, 120)), (button.rect.x, button.rect.bottom + 14))
+                        preview_text += f" ({preview_buff})"
+                    if preview_text:
+                        screen.blit(self.font_small.render(preview_text, True, (120, 255, 120)), (button.rect.x, button.rect.bottom + 14))
 
         self._draw_stats_modal(screen)
 

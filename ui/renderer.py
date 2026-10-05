@@ -93,6 +93,10 @@ SPRITE_FILES = {
     ("tower_of_light", 1): "structure/tower_of_light-1.png",
     ("tower_of_light", 2): "structure/tower_of_light-2.png",
     ("tower_of_light", 3): "structure/tower_of_light-3.png",
+
+    # STONE CIRCLE (Vòng tròn đá, có sẵn ở tâm bản đồ)
+    ("stone_circle", 1): "structure/stone_circle-1.png",
+    ("stone_circle", 2): "structure/stone_circle-2.png",
 }
 
 

@@ -14,7 +14,7 @@ class Building(Entity):
     key = "building"          # ID định danh dùng để lưu/tải file, vd "woodcutter"
     name = "Building"         # Tên hiển thị trên UI
     base_cost = {}            # Giá xây ban đầu (level 1), vd {"wood": 30}
-    cost_multiplier = 1.5     # Mỗi cấp nâng, giá x1.5
+    cost_multiplier = 2.0     # Giá nâng cấp cấp thứ n = giá gốc x hệ_số^(n-2): Lv2 = giá gốc, Lv3 = gấp 2
     base_produces = {}        # Sản lượng ở level 1, vd {"wood": 2}
     icon_key = "default"      # Tên sprite trong renderer
     max_level = 3
@@ -22,6 +22,8 @@ class Building(Entity):
     boost_per_tile = 0.0     # mỗi ô kề đúng địa hình cộng thêm bao nhiêu % sản lượng
     build_terrain = None     # địa hình BẮT BUỘC để xây được, vd "forest". None = xây đâu cũng được
     buildable = True         # False = có sẵn từ đầu game, người chơi không tự xây được
+    build_cost_step = {}     # mỗi công trình CÙNG LOẠI đã xây làm giá xây tăng thêm bấy nhiêu, vd {"wood": 1}: 5, 6, 7...
+    upgrade_base_cost = None # giá nâng lên Lv2 (None = dùng base_cost); Lv3 nhân thêm cost_multiplier
 
     def __init__(self, row, col):
         super().__init__(entity_id=f"{self.key}_{row}_{col}", row=row, col=col)
@@ -39,7 +41,8 @@ class Building(Entity):
         """Giá cần trả để nâng từ level hiện tại lên level + 1."""
         factor = self.cost_multiplier ** (self.level - 1) # ví dụ level 1 -> 2: x1.5, level 2 -> 3: x1.5^2 = x2.25
         result = {}
-        for res, amount in self.base_cost.items():
+        base = self.upgrade_base_cost or self.base_cost
+        for res, amount in base.items():
             result[res] = round(amount * factor) # round để tránh số lẻ, ví dụ 10 * 1.5 = 15, nhưng 10 * 1.5^2 = 22.5 -> round thành 23
         return result
 
@@ -76,6 +79,8 @@ class Woodcutter(Building):
     key = "woodcutter"
     name = "Nhà đốn gỗ"
     base_cost = {"wood": 5}
+    build_cost_step = {"wood": 1}                 # nhà gỗ thứ 1: 5 gỗ, thứ 2: 6, thứ 3: 7...
+    upgrade_base_cost = {"wood": 5, "stone": 2}   # nâng Lv2; Lv3 gấp đôi
     base_produces = {"wood": 10}  # mỗi PHÚT ở level 1
     icon_key = "woodcutter"
     boost_terrain = "forest"
@@ -87,6 +92,8 @@ class Quarry(Building):
     key = "quarry"
     name = "Mỏ đá"
     base_cost = {"wood": 15}
+    build_cost_step = {"wood": 3}
+    upgrade_base_cost = {"wood": 15, "stone": 5}
     base_produces = {"stone": 4}  # mỗi PHÚT ở level 1
     icon_key = "quarry"
     boost_terrain = "rock"
@@ -98,7 +105,11 @@ class TowerOfLight(Building):
     key = "tower_of_light"
     name = "Tháp ánh sáng"
     base_cost = {"wood": 25, "light": 15}   # light = mana
+    build_cost_step = {"wood": 10}
+    upgrade_base_cost = {"wood": 25, "light": 15, "stone": 10}
+    cost_multiplier = 8                    # nâng Lv2 = giá gốc, nâng Lv3 = gấp 8 (tổng xây+nâng ~250 gỗ + 150 mana)
     base_produces = {"light": 1.5}          # mỗi PHÚT ở level 1
+    slow_per_level = 0.35                   # mỗi cấp tháp kéo dài thêm 35% thời gian giữa 2 lần bóng tối lan
     icon_key = "tower_of_light"
     build_terrain = "grass"       # chỉ xây được trên đất bằng
 
@@ -107,9 +118,11 @@ class MushroomHut(Building):
     key = "mushroom_hut"
     name = "Nhà nấm"
     base_cost = {"wood": 20, "stone": 5}
-    base_produces = {"light": 3}  # mana, mỗi PHÚT ở level 1
-    icon_key = "mushroom_hut"
-    build_terrain = "grass"       # sau này đổi thành "mushroom" khi có địa hình rừng nấm
+    build_cost_step = {"wood": 3, "stone": 1}
+    upgrade_base_cost = {"wood": 20, "stone": 9}
+    base_produces = {"light": 6}  # mana, mỗi PHÚT ở level 1
+    icon_key = "mushroom"
+    build_terrain = "mushroom"    # chỉ xây được TRÊN ô nấm
 
 
 class StoneCircle(Building):

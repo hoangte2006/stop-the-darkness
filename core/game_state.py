@@ -8,7 +8,7 @@ không phải Leader; báo Leader nếu cần thêm dữ liệu/hàm mới.
 from core import rules
 from core.constants import GRID_COLS, GRID_ROWS
 from core.map_generator import generate_map
-from entities.building import BUILDING_TYPES, StoneCircle
+from entities.building import BUILDING_TYPES, StoneCircle, TowerOfLight
 from entities.tile import Tile
 
 
@@ -19,6 +19,7 @@ class GameState:
         # 1. Kho tài nguyên người chơi
         self.resources = {"wood": 20, "stone": 0, "tech": 0, "light": 0}
         self._carry = {}   # phần lẻ chưa đủ 1 đơn vị của từng tài nguyên
+        self._dark_charge = 0.0   # "sức chứa" bóng tối: đủ 1 thì lan thêm 1 ô, tháp làm nó đầy chậm lại
 
         # 2. Trạng thái UI dùng chung
         self.is_paused = False
@@ -58,6 +59,34 @@ class GameState:
             return self.grid[row][col]
         return None
 
+    def build_cost(self, building_key):
+        building_cls = BUILDING_TYPES[building_key]
+        owned = 0
+        for row in self.grid:                     
+            for tile in row:                        
+                if isinstance(tile.building, building_cls):  
+                    owned = owned + 1
+        cost = {}
+        
+        for res, amount in building_cls.base_cost.items():
+            cost[res] = amount 
+
+        for res, step in building_cls.build_cost_step.items():
+            if res not in cost:                    
+                cost[res] = 0
+            cost[res] = cost[res] + step * owned
+
+        return cost
+
+
+    def production_per_minute(self, building_cls, row, col, level=1):
+        """Sản lượng mỗi PHÚT của công trình `building_cls` ở cấp `level` tại (row, col), đã tính buff ô kề."""
+        multiplier = 1.0
+        if building_cls.boost_terrain:
+            adjacent = rules.count_adjacent_terrain(self.grid, row, col, building_cls.boost_terrain)
+            multiplier += adjacent * building_cls.boost_per_tile
+        return {res: amount * level * multiplier for res, amount in building_cls.base_produces.items()}
+
     def add_building(self, row, col, building_key):
         """Đặt công trình `building_key` (vd "woodcutter") tại (row, col).
 
@@ -75,8 +104,9 @@ class GameState:
         if tile.is_dark or tile.building is not None:
             return False
 
+        cost = self.build_cost(building_key)
         enough = True
-        for res, amount in building_cls.base_cost.items():
+        for res, amount in cost.items():
             have = self.resources.get(res, 0)
             if have < amount:
                 enough = False
@@ -84,7 +114,7 @@ class GameState:
         if not enough:
             return False
 
-        for res, amount in building_cls.base_cost.items():
+        for res, amount in cost.items():
             self.resources[res] -= amount
 
         tile.building = building_cls(row, col)
@@ -143,8 +173,20 @@ class GameState:
         """Lan bóng tối thêm 1 ô. Tốc độ nhanh/chậm do main.py tự rút ngắn/kéo dài nhịp gọi."""
         if self.is_paused:
             return
-        rules.spread_darkness(self.grid)   # bo vong for lap N lan
+        self._dark_charge += 1 / (1 + self.darkness_slowdown()) 
+        if self._dark_charge >= 1:
+            self._dark_charge -= 1
+            rules.spread_darkness(self.grid)
         self._check_game_over()
+
+    def darkness_slowdown(self):
+        """Tổng độ làm chậm bóng tối của các Tháp Ánh Sáng còn sống (ô chưa bị tối), tăng theo cấp tháp."""
+        total = 0.0
+        for row in self.grid:
+            for tile in row:
+                if isinstance(tile.building, TowerOfLight) and not tile.is_dark:
+                    total += TowerOfLight.slow_per_level * tile.building.level
+        return total
 
     def _check_game_over(self):
         """Kiểm tra thua: bóng tối đã lan hết mức có thể (đã duyệt hết bản đồ)."""
@@ -152,10 +194,13 @@ class GameState:
             self.game_over = True
 
     def _check_win_condition(self):
-        """Kiểm tra thắng: Vòng Tròn Đá đã được nâng lên level 2."""
+        """Kiểm tra thắng: Vòng Tròn Đá lên level 2, hoặc một Tháp Ánh Sáng lên cấp tối đa."""
         for row in self.grid:
             for tile in row:
-                if isinstance(tile.building, StoneCircle) and tile.building.level >= 2:
+                building = tile.building
+                if isinstance(building, StoneCircle) and building.level >= building.max_level:
+                    self.game_won = True
+                elif isinstance(building, TowerOfLight) and building.level >= building.max_level:
                     self.game_won = True
 
 
@@ -180,6 +225,7 @@ class GameState:
     def load_from_dict(self, data):
         self.resources = {res: int(amount) for res, amount in data["resources"].items()}
         self._carry = {}
+        self._dark_charge = 0.0
         self.game_over = data.get("game_over", False)
         self.game_won = data.get("game_won", False)
         for r, row in enumerate(data["grid"]):

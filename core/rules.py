@@ -75,9 +75,8 @@ def spread_darkness(grid):
         return   # da toi het toan bo ban do, khong con o nao de toi nua
 
     row, col = _SPIRAL_ORDER[_progress]
-    tile = grid[row][col] 
-    if not tile.is_lighted:
-        tile.is_dark = True
+    tile = grid[row][col]
+    tile.is_dark = True
 
     _progress += 1
 

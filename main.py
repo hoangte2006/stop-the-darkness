@@ -31,7 +31,10 @@ def main():
 
     RESOURCE_EVENT = pygame.USEREVENT + 1
     DARKNESS_EVENT = pygame.USEREVENT + 2
-    DARKNESS_INTERVAL_MS = 5000   # 1 o toi moi 5 giay o toc do 1x
+    DARKNESS_INTERVAL_MS = 6000   # 1 o toi moi 6 giay o toc do 1x
+
+    SAVE_KEYS = {pygame.K_q: 1, pygame.K_w: 2, pygame.K_e: 3}   # Q/W/E luu vao slot 1/2/3
+    LOAD_KEYS = {pygame.K_1: 1, pygame.K_2: 2, pygame.K_3: 3}   # 1/2/3 nap tu slot 1/2/3
 
     # Trang thai man hinh: "start_menu" | "playing" | "game_over"
     screen_state = "start_menu"
@@ -98,24 +101,22 @@ def main():
                         for res in game.resources:
                             game.resources[res] += 100
 
-                    elif event.key == pygame.K_s:
-                        save_game(game.to_dict())
-                        print("Game saved!")
-                        print("File: saves/save.json")
+                    elif event.key in SAVE_KEYS:
+                        slot = SAVE_KEYS[event.key]
+                        if save_game(game.to_dict(), slot):
+                            print(f"Game saved! File: saves/save-slot{slot}.json")
 
-                    elif event.key == pygame.K_l:
-                        try:
-                            loaded_data = load_game("saves/save.json")
-                            game.load_from_dict(loaded_data)
-                            print("Game loaded!")
-                            print("File: saves/save.json")
-
-                        except FileNotFoundError:
-                            print("Không tìm thấy save game!")
-                            print("Hãy nhấn S để lưu game trước.")
-
-                        except Exception as e:
-                            print(f"Load game thất bại: {e}")
+                    elif event.key in LOAD_KEYS:
+                        slot = LOAD_KEYS[event.key]
+                        loaded_data = load_game(slot)
+                        if not loaded_data:
+                            print(f"Slot {slot} chưa có save. Nhấn Q/W/E để lưu vào slot 1/2/3.")
+                        else:
+                            try:
+                                game.load_from_dict(loaded_data)
+                                print(f"Game loaded! File: saves/save-slot{slot}.json")
+                            except Exception as e:
+                                print(f"Load game thất bại: {e}")
 
                 # là sự kiện nhấn chuột trái / phải để chọn ô hoặc xây Tháp Ánh Sáng
                 elif event.type == pygame.MOUSEBUTTONDOWN:
