@@ -98,10 +98,18 @@ class TowerOfLight(Building):
     base_produces = {"light": 1}
     icon_key = "tower_of_light"
 
+class StoneCircle(Building):
+    key = "stone_circle"
+    name = "Vòng tròn đá"
+    base_cost = {"stone": 10}
+    base_produces = {}
+    icon_key = "stone_circle"
+    max_level = 2
 
 # Registry để tra class theo `key` (dùng khi xây công trình mới hoặc load save file).
 BUILDING_TYPES = {
     Woodcutter.key: Woodcutter,
     Quarry.key: Quarry,
     TowerOfLight.key: TowerOfLight,
+    StoneCircle.key: StoneCircle,
 }
