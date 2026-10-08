@@ -4,7 +4,6 @@ import pygame
 
 from core.constants import *
 from core.game_state import GameState
-from entities.building import TowerOfLight
 from services.storage import save_game, load_game
 from services.audio import AudioManager
 from ui import renderer
@@ -118,22 +117,14 @@ def main():
                             except Exception as e:
                                 print(f"Load game thất bại: {e}")
 
-                # là sự kiện nhấn chuột trái / phải để chọn ô hoặc xây Tháp Ánh Sáng
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:  # Chuột trái: chọn ô (chỉ tính click trong vùng bàn cờ)
+                    if event.button == 1: 
                         mx, my = pygame.mouse.get_pos()
                         if mx < SIDEBAR_X:
                             row = my // TILE_SIZE
                             col = mx // TILE_SIZE
                             game.selected_tile = game.get_tile(row, col)
 
-                    elif event.button == 3:  # Chuột phải: xây Tháp Ánh Sáng thử nghiệm
-                        if game.selected_tile:
-                            built = game.add_building(
-                                game.selected_tile.row, game.selected_tile.col, TowerOfLight.key
-                            )
-                            if built:
-                                audio.play_sound("build")
 
             elif screen_state == "game_over":
                 action = menu.handle_game_over_event(event)
