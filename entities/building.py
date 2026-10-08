@@ -135,6 +135,13 @@ class StoneCircle(Building):
     build_terrain = "grass"
     buildable = False             # có sẵn ở tâm bản đồ, không xây thêm được
 
+class StoneCircle(Building):
+    key = "stone_circle"
+    name = "Vòng tròn đá"
+    base_cost = {"stone": 10}
+    base_produces = {}
+    icon_key = "stone_circle"
+    max_level = 2
 
 # Registry để tra class theo `key` (dùng khi xây công trình mới hoặc load save file).
 BUILDING_TYPES = {
