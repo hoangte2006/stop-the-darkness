@@ -34,7 +34,6 @@ Số liệu đã chốt: **grid 12x12**, **tile 40x40px**, **sidebar 260px**,
 | `Space` | Tạm dừng / tiếp tục |
 | `Q` / `W` / `E` | **Lưu** vào slot 1 / 2 / 3 (`saves/save-slotN.json`) |
 | `1` / `2` / `3` | **Nạp** từ slot 1 / 2 / 3 |
-| Chuột phải vào ô | Xây Tháp ánh sáng (**tạm thời**, sẽ bỏ khi sidebar có nút Tháp) |
 | `F1` | **Phím dev**: +100 mỗi tài nguyên (**phải xóa trước ngày thuyết trình**) |
 
 ---
@@ -204,10 +203,11 @@ Cách chọn sprite (bảng `SPRITE_FILES`, khoá là `(loại, cấp)`, ảnh t
 - Công trình: tra theo `building.icon_key` và `building.level`, ví dụ
   `("woodcutter", 2)`.
 
-> ⚠️ **Thêm công trình mới thì phải thêm sprite** vào `SPRITE_FILES`. Công trình có
-> `icon_key` chưa có trong bảng sẽ làm **game crash** (`KeyError`). Hiện có sprite
+> ⚠️ **Thêm công trình mới thì nên thêm sprite** vào `SPRITE_FILES`. Công trình có
+> `icon_key` (hoặc ô có địa hình) chưa có trong bảng sẽ **in cảnh báo và dùng ảnh
+> dự phòng** (game không còn crash), nhưng hình sẽ không đúng. Hiện có sprite
 > cho: `woodcutter`, `quarry`, `tower_of_light`, `mushroom` (3 cấp) và
-> `stone_circle` (2 cấp).
+> `stone_circle` (2 cấp, ảnh riêng của TV2 trong `assets/images/sprites/stone-circle/`).
 
 ### TV3 — `ui/button.py`, `ui/sidebar.py` (đã hoàn thành)
 - `Button`: `handle_event(event) -> bool`, `is_clicked(mouse_pos) -> bool`, `draw(screen)`.
@@ -220,9 +220,10 @@ Sidebar hiện: tài nguyên, nút tốc độ/Pause, thông tin ô, nút xây (
 lượng/phút + buff ô kề khi rê chuột), nút Upgrade/Demolish kèm sản lượng
 hiện tại và sau nâng cấp, độ làm chậm của Tháp, bảng Thống kê.
 
-**Đang giao TV3:** thêm nút xây **Tháp ánh sáng** nhìn thấy được trong màn hình
-(hiện các nút cách nhau 70px nên nút Tháp, ở `y=485`, nằm ngoài màn hình cao 480)
-và bỏ qua công trình `buildable = False`. Hạn mở PR 11/10.
+**Đã xong (TV3):** 4 nút xây (Nhà gỗ, Mỏ đá, Nhà nấm, **Tháp ánh sáng**) nằm trọn
+trong màn hình, bỏ qua công trình `buildable = False` (Vòng tròn đá), nhãn "Mana",
+buff Mỏ đá hiển thị đúng 25%. Tháp ánh sáng giờ chỉ xây từ nút trên sidebar
+(đã bỏ phím chuột phải trong `main.py`).
 
 ### TV4 — `services/storage.py` (đã hoàn thành phần lưu 3 slot)
 - `save_game(data: dict, saveSlot: int = 1) -> bool` — ghi `data` vào
@@ -272,8 +273,9 @@ sửa lại các file này, hãy `git pull` bản mới nhất trước để kh
 
 | File (của ai) | Leader đã làm gì |
 |---|---|
-| `ui/sidebar.py` (TV3) | Nút Build bật/tắt và chữ "Cost" dùng `game.build_cost()` thay vì `base_cost`; thêm các dòng "Sinh/phút", "Nâng LvN" và độ làm chậm của Tháp (`production_per_minute`); thêm hàm `_format_rates`. Phần còn lại là code của TV3. |
-| `ui/renderer.py` (TV2) | Thêm 3 dòng vào `SPRITE_FILES` cho `stone_circle` (Lv1, Lv2) và 2 ảnh `structure/stone_circle-1.png`, `-2.png` (tạm sao chép từ ảnh đá `stone-3.png`, `stone-2.png`). TV2 có thể thay bằng ảnh đẹp hơn cùng tên. |
+| `ui/sidebar.py` (TV3) | Nút Build bật/tắt và chữ "Cost" dùng `game.build_cost()` thay vì `base_cost`; thêm các dòng "Sinh/phút", "Nâng LvN" và độ làm chậm của Tháp (`production_per_minute`); thêm hàm `_format_rates`. TV3 đã giữ các phần này trong bản mới và bổ sung nút Tháp, layout. |
+| `ui/renderer.py` (TV2) | **Lấy nguyên bản mới nhất của TV2** (ảnh dự phòng thay vì crash, ảnh Vòng tròn đá riêng). 3 dòng `stone_circle` Leader từng thêm đã được thay bằng bản của TV2. Hai ảnh tạm cũ `structure/stone_circle-1.png`, `-2.png` không còn được dùng. |
+| `entities/building.py` (Leader) | Nhánh TV2 có thêm một class `StoneCircle` riêng (giá `{"stone": 10}`, không `buildable = False`) — **không lấy**, vì sẽ đè lên class của Leader (100 stone + 100 mana, `buildable = False`) và làm sai luật thắng. File này **chỉ Leader sửa**. |
 | `ui/menu.py` (TV5) | Ghép nhánh TV5, **lấy nguyên bản của TV5** khi xung đột, không sửa gì. |
 | `services/storage.py` (TV4) | Lấy `storage.py` từ nhánh TV4. **Không lấy** thay đổi của TV4 trong `core/game_state.py` và `core/rules.py` (bản đó làm mất cấp công trình và `game_won` khi nạp save; Leader đã có sẵn lưu/nạp `dark_progress`). |
 | `main.py` | Leader viết phần xử lý phím lưu/nạp theo 3 slot (`SAVE_KEYS`/`LOAD_KEYS`) thay cho khối 3 nhánh lặp của TV4. |
@@ -287,9 +289,10 @@ sửa lại các file này, hãy `git pull` bản mới nhất trước để kh
    `build_cost_step`, `upgrade_base_cost`, `base_produces`, `icon_key`,
    `build_terrain`...) và đăng ký vào `BUILDING_TYPES`.
 2. `ui/renderer.py` (TV2): thêm sprite cho `icon_key` vào `SPRITE_FILES` (mỗi cấp
-   một ảnh) — **thiếu là crash**.
-3. `ui/sidebar.py` (TV3): nút xây tự được tạo từ `BUILDING_TYPES`, nhưng kiểm tra
-   nút còn nằm **trong màn hình** (sidebar chỉ vừa khoảng 4 nút xây).
+   một ảnh). Thiếu thì game không crash nhưng hiện ảnh dự phòng và in cảnh báo.
+3. `ui/sidebar.py` (TV3): nút xây tự được tạo từ `BUILDING_TYPES` (bỏ qua công trình
+   `buildable = False`); hiện bố cục chứa vừa **4 nút xây** (y từ 325, cách 30px,
+   cao 26px), thêm nút thứ 5 phải kiểm tra còn nằm **trong màn hình**.
 4. Cập nhật bảng công trình trong file này và chạy thử mô phỏng cân bằng.
 
 ---
@@ -300,8 +303,8 @@ sửa lại các file này, hãy `git pull` bản mới nhất trước để kh
 - Ghép màn Save/Load và Hướng dẫn chơi vào `main.py` khi TV4/TV5 mở PR (thêm 2
   trạng thái màn hình `"save_load"` và `"tutorial"`, mở bằng nút ở start menu và
   một phím trong game).
-- Bỏ phím chuột phải xây Tháp trong `main.py` **sau khi** PR của TV3 (nút Tháp trên
-  sidebar) đã merge.
+- ~~Bỏ phím chuột phải xây Tháp trong `main.py`~~ — **đã xong** (Tháp xây từ nút
+  trên sidebar).
 - **Xóa phím dev F1** trước ngày thuyết trình.
 
 **Đã chủ động đóng băng, để sau giữa kỳ:** luật "xây kề tài nguyên", công trình
