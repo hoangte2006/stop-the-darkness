@@ -27,3 +27,11 @@ COLOR_ROCK = (130, 130, 140)    # Núi đá
 # Màu bóng tối & ánh sáng
 COLOR_DARKNESS = (20, 10, 30)   # Bóng tối nuốt chửng
 COLOR_LIGHT_TOWER = (220, 180, 50) # Tháp ánh sáng
+
+# Bảng độ khó: production = hệ số nhân sản lượng, darkness_ms = số mili-giây giữa 2 lần bóng tối lan (tốc độ 1x)
+DIFFICULTIES = {
+    "easy":   {"production": 1.25, "darkness_ms": 7000, "map": 1},
+    "normal": {"production": 1.15, "darkness_ms": 6000, "map": 1},
+    "hard":   {"production": 1.0,  "darkness_ms": 6000, "map": 1},
+}
+DEFAULT_DIFFICULTY = "normal"

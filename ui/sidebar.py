@@ -44,6 +44,16 @@ class Sidebar:
             hover_color=(55, 75, 105),
         )
 
+        # Nút mở màn Save/Load: Sidebar chỉ bật cờ open_save_load, main.py đọc cờ này để đổi màn hình
+        self.open_save_load = False
+        self.save_load_button = Button(
+            rect=(self.sidebar_rect.x + 200, 110, 40, 24),
+            text="Menu",
+            font=self.font_small,
+            bg_color=(35, 45, 60),
+            hover_color=(55, 75, 105),
+        )
+
         # Nút đóng modal Thống kê (tọa độ khớp chuẩn với modal)
         self.close_stats_button = Button(
             rect=(SIDEBAR_X - 220, 400, 100, 30),
@@ -147,6 +157,10 @@ class Sidebar:
                 self.show_stats_modal = False
             return
 
+        if self.save_load_button.handle_event(event):
+            self.open_save_load = True
+            return
+
         if self.stats_button.handle_event(event):
             self.show_stats_modal = True
             return
@@ -211,6 +225,7 @@ class Sidebar:
             return
 
         self.stats_button.is_hovered = self.stats_button.rect.collidepoint(mouse_position)
+        self.save_load_button.is_hovered = self.save_load_button.rect.collidepoint(mouse_position)
 
         ACTIVE_COLOR = (80, 120, 180)
         PAUSE_COLOR = (180, 60, 60)
@@ -278,6 +293,7 @@ class Sidebar:
         for btn in self.speed_buttons:
             btn.draw(screen)
         self.stats_button.draw(screen)
+        self.save_load_button.draw(screen)
 
         pygame.draw.line(screen, (40, 45, 55), (self.sidebar_rect.x + 10, 180), (self.sidebar_rect.right - 10, 180))
 

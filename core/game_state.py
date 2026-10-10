@@ -6,15 +6,24 @@ không phải Leader; báo Leader nếu cần thêm dữ liệu/hàm mới.
 """
 
 from core import rules
-from core.constants import GRID_COLS, GRID_ROWS
+from core.constants import GRID_COLS, GRID_ROWS, DIFFICULTIES, DEFAULT_DIFFICULTY
 from core.map_generator import generate_map
 from entities.building import BUILDING_TYPES, StoneCircle, TowerOfLight
 from entities.tile import Tile
 
 
 class GameState:
-    def __init__(self):
+    def __init__(self, difficulty=DEFAULT_DIFFICULTY):
         rules.reset_darkness()
+
+        if difficulty not in DIFFICULTIES:
+            print(f"Difficulty '{difficulty}' không hợp lệ, dùng mặc định '{DEFAULT_DIFFICULTY}'.")
+            difficulty = DEFAULT_DIFFICULTY
+        
+        self.difficulty = difficulty
+
+        self.production_multiplier = DIFFICULTIES[difficulty]["production"]
+        self.darkness_interval_ms = DIFFICULTIES[difficulty]["darkness_ms"]
 
         # 1. Kho tài nguyên người chơi
         self.resources = {"wood": 20, "stone": 0, "tech": 0, "light": 0}
@@ -31,7 +40,7 @@ class GameState:
 
         # 3. Sinh bản đồ địa hình (TV6 đã thay code)
         while True:
-            terrain_map = generate_map(GRID_ROWS, GRID_COLS)
+            terrain_map = generate_map(GRID_ROWS, GRID_COLS, difficulty=DIFFICULTIES[difficulty]["map"])
             flat = [t for row in terrain_map for t in row]
             if all(flat.count(t) >= 6 for t in ("forest", "rock", "water")):
                 break
@@ -85,7 +94,7 @@ class GameState:
         if building_cls.boost_terrain:
             adjacent = rules.count_adjacent_terrain(self.grid, row, col, building_cls.boost_terrain)
             multiplier += adjacent * building_cls.boost_per_tile
-        return {res: amount * level * multiplier for res, amount in building_cls.base_produces.items()}
+        return {res: amount * level * multiplier * self.production_multiplier for res, amount in building_cls.base_produces.items()}
 
     def add_building(self, row, col, building_key):
         """Đặt công trình `building_key` (vd "woodcutter") tại (row, col).
@@ -161,7 +170,7 @@ class GameState:
                         adjacent_count = rules.count_adjacent_terrain(self.grid, r, c, building.boost_terrain)
                         bonus_multiplier += adjacent_count * building.boost_per_tile
                     for res, amount in building.produces.items():
-                        gained = self._carry.get(res, 0.0) + amount / 60 * bonus_multiplier
+                        gained = self._carry.get(res, 0.0) + amount / 60 * bonus_multiplier * self.production_multiplier
                         whole = int(gained) 
                         self._carry[res] = gained - whole
                         self.resources[res] = self.resources.get(res, 0) + whole
@@ -220,9 +229,20 @@ class GameState:
             "game_over": self.game_over,
             "game_won": self.game_won,
             "dark_progress": rules.get_darkness_progress(),
+            "difficulty": self.difficulty,
+
         }
 
     def load_from_dict(self, data):
+        # Khôi phục độ khó 
+        saved_difficulty = data.get("difficulty", self.difficulty)
+        if saved_difficulty not in DIFFICULTIES:
+            print(f"Difficulty '{saved_difficulty}' trong save không hợp lệ, dùng mặc định '{DEFAULT_DIFFICULTY}'.")
+            saved_difficulty = DEFAULT_DIFFICULTY
+        self.difficulty = saved_difficulty
+        self.production_multiplier = DIFFICULTIES[saved_difficulty]["production"]
+        self.darkness_interval_ms = DIFFICULTIES[saved_difficulty]["darkness_ms"]
+
         self.resources = {res: int(amount) for res, amount in data["resources"].items()}
         self._carry = {}
         self._dark_charge = 0.0

@@ -4,3 +4,4 @@ __pycache__/
 .history/
 saves/*.json
 .claude/settings.local.json
+settings.json
