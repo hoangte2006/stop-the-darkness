@@ -334,7 +334,8 @@ class Sidebar:
                     screen.blit(self.font_small.render(f"Nâng Lv{b_lvl + 1}: {self._format_rates(rates_next)}", True, (160, 255, 160)), (self.sidebar_rect.x + 15, 306))
                 else:
                     screen.blit(self.font_small.render("Đã đạt cấp tối đa", True, (255, 200, 120)), (self.sidebar_rect.x + 15, 306))
-            slow_per_level = getattr(type(b), "slow_per_level", 0)
+            # Chỉ Tháp có thuộc tính slow_per_level; giá trị thật theo độ khó của ván (game_state.tower_slow)
+            slow_per_level = getattr(game_state, "tower_slow", 0) if getattr(type(b), "slow_per_level", 0) else 0
             if slow_per_level:
                 slow_text = f"Làm chậm bóng tối: +{round(slow_per_level * b_lvl * 100)}%"
                 if b_lvl < b_max:

@@ -24,6 +24,7 @@ class GameState:
 
         self.production_multiplier = DIFFICULTIES[difficulty]["production"]
         self.darkness_interval_ms = DIFFICULTIES[difficulty]["darkness_ms"]
+        self.tower_slow = DIFFICULTIES[difficulty]["tower_slow"]   # mỗi cấp tháp làm chậm bóng tối bao nhiêu
 
         # 1. Kho tài nguyên người chơi
         self.resources = {"wood": 20, "stone": 0, "tech": 0, "light": 0}
@@ -194,7 +195,7 @@ class GameState:
         for row in self.grid:
             for tile in row:
                 if isinstance(tile.building, TowerOfLight) and not tile.is_dark:
-                    total += TowerOfLight.slow_per_level * tile.building.level
+                    total += self.tower_slow * tile.building.level
         return total
 
     def _check_game_over(self):
@@ -242,6 +243,7 @@ class GameState:
         self.difficulty = saved_difficulty
         self.production_multiplier = DIFFICULTIES[saved_difficulty]["production"]
         self.darkness_interval_ms = DIFFICULTIES[saved_difficulty]["darkness_ms"]
+        self.tower_slow = DIFFICULTIES[saved_difficulty]["tower_slow"]
 
         self.resources = {res: int(amount) for res, amount in data["resources"].items()}
         self._carry = {}
