@@ -32,6 +32,6 @@ COLOR_LIGHT_TOWER = (220, 180, 50) # Tháp ánh sáng
 DIFFICULTIES = {
     "easy":   {"production": 1.25, "darkness_ms": 7000, "map": 1},
     "normal": {"production": 1.15, "darkness_ms": 6000, "map": 1},
-    "hard":   {"production": 1.0,  "darkness_ms": 6000, "map": 1},
+    "hard":   {"production": 1.0,  "darkness_ms": 6000, "map": 2},
 }
 DEFAULT_DIFFICULTY = "normal"
